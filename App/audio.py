@@ -185,22 +185,22 @@ def tts_ja(text, speed_up_factor=1.2, output_path='../Assets/Audio/ai.wav', gain
 def list_microphones():
     microphones = []
     devices = sd.query_devices()
-    
-    for device in devices:
+
+    for idx, device in enumerate(devices):
         # Check if the device is an input device (microphone)
         if device['max_input_channels'] > 0:
-            microphones.append(device['name'])
+            microphones.append(f"{device['name']} (Index: {idx})")
     
     return microphones
 
 def list_output_devices():
     output_devices = []
     devices = sd.query_devices()
-    
-    for device in devices:
+
+    for idx, device in enumerate(devices):
         # Check if the device is an output device (speaker/headphone)
         if device['max_output_channels'] > 0:
-            output_devices.append(device['name'])
+            output_devices.append(f"{device['name']} (Index: {idx})")
     
     return output_devices
 
@@ -246,25 +246,31 @@ def ensure_models_downloaded():
 
 def translate(text, target_lang):
     try:
-        # Detect the source language
+        # Step 1: Detect the source language
         src_lang = detect(text)
 
-        if src_lang not in LANGUAGE_MODEL_MAP or target_lang not in LANGUAGE_MODEL_MAP[src_lang]:
-            print(f"Language pair '{src_lang}' to '{target_lang}' not supported. Returning the original text.")
+        # Step 2: Check if the detected language is supported in the LANGUAGE_MODEL_MAP
+        if src_lang not in LANGUAGE_MODEL_MAP or target_lang not in LANGUAGE_MODEL_MAP.get(src_lang, {}):
+            print(f"Language pair '{src_lang}' to '{target_lang}' not supported. Assuming input is in English.")
+            src_lang = 'en'  # Default to English as the source language
+
+        # Step 3: Check if there's a model for translation from English to the target language
+        if target_lang not in LANGUAGE_MODEL_MAP.get(src_lang, {}):
+            print(f"Cannot find a translation model for '{src_lang}' to '{target_lang}'. Returning the original text.")
             return text
 
-        # Load the model and tokenizer for the detected language pair
+        # Step 4: Load the model and tokenizer for the detected language pair (or English to target language)
         model_name = LANGUAGE_MODEL_MAP[src_lang][target_lang]
         tokenizer = MarianTokenizer.from_pretrained(model_name)
         model = MarianMTModel.from_pretrained(model_name)
 
-        # Tokenize the input text
+        # Step 5: Tokenize the input text
         inputs = tokenizer(text, return_tensors="pt", padding=True)
 
-        # Perform translation
+        # Step 6: Perform the translation
         translated = model.generate(**inputs)
 
-        # Decode the translated text
+        # Step 7: Decode the translated text
         translated_text = tokenizer.batch_decode(translated, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
         return translated_text[0]
@@ -296,11 +302,27 @@ def play(file_path, output_device_index=None):
         audio_data = np.array(resampled_audio.get_array_of_samples())
         audio_data = audio_data.astype(np.float32) / (2 ** 15)  # Normalize the audio data
 
+        # If no output device index provided, use default output device
+        if output_device_index is None:
+            output_device_index = sd.default.device['output']
+
+        # Get information about the selected output device
+        device_info = sd.query_devices(output_device_index, 'output')
+        expected_channels = device_info['max_output_channels']
+
+        # Ensure the audio has the correct number of channels
+        if resampled_audio.channels != expected_channels:
+            print(f"Resampling to match the output device channels: {expected_channels} channels.")
+            resampled_audio = resampled_audio.set_channels(expected_channels)
+
         # Play the resampled audio using the selected output device
         sd.play(audio_data, samplerate=resampled_audio.frame_rate, device=output_device_index)
         sd.wait()  # Wait until audio is finished playing
+
     except Exception as e:
         print(f"An error occurred while trying to play the audio: {e}")
+
+
         
 if __name__ == "__main__":
     ensure_models_downloaded()

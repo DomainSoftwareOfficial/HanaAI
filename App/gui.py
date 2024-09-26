@@ -6,6 +6,7 @@ import random
 import threading
 import whisper
 import logging
+import emoji
 from dotenv import load_dotenv
 from chloe import CWindow
 from hana import HWindow
@@ -106,6 +107,8 @@ class App(ctk.CTk):
         self.picker_thread = None
         self.handler_thread = None
 
+        self.known_emotes = []
+
         # Resolve the base path for PyInstaller
         self.base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 
@@ -203,11 +206,11 @@ class App(ctk.CTk):
         right_frame.grid_rowconfigure(5, weight=1)  # Empty row below
 
         # Create and stack the four buttons vertically and fill the right side with custom text
-        stacked_button_texts = ["Office", "Bedroom", "Station", "Beach"]  # Custom texts for each button
-
+        stacked_button_texts = ["Office", "Bedroom", "Station", "Beach"]
         for i, button_text in enumerate(stacked_button_texts):
-            button = ctk.CTkButton(right_frame, text=button_text, corner_radius=0)
-            button.grid(row=i+1, column=1, pady=5, sticky="ew")  # Centered horizontally
+            button = ctk.CTkButton(right_frame, text=button_text, corner_radius=0,
+                                   command=lambda text=button_text: self.create_text_file(text))
+            button.grid(row=i+1, column=1, pady=5, sticky="ew")
         # Configure lower frame to ensure proper stretching
         lower_frame.columnconfigure(0, weight=2)
         lower_frame.columnconfigure(1, weight=1)
@@ -222,6 +225,30 @@ class App(ctk.CTk):
         open_window2_button.grid(row=6, column=1, padx=10, pady=10, sticky="ew")
 
         self.stop_random_picker = threading.Event()
+
+    def create_text_file(self, button_text):
+        """Function to create a text file based on the button clicked."""
+        folder_path = self.resource_path('../Data/Output')  # Replace with the actual folder path
+        file_contents = {
+            "Office": "This is the Office file.",
+            "Bedroom": "This is the Bedroom file.",
+            "Station": "This is the Station file.",
+            "Beach": "This is the Beach file."
+        }
+
+        file_name = os.path.join(folder_path, f"{button_text}.txt")
+
+        try:
+            # Write content to the file
+            with open(file_name, "w") as file:
+                file.write(file_contents[button_text])
+
+            # Show a confirmation message
+            print("File Created", f"{button_text}.txt has been created!")
+
+        except Exception as e:
+            # Show an error message if file creation fails
+            print("Error", f"Could not create file: {str(e)}")
 
     def get_active_language(self):
         # Maps the switch to the language code
@@ -375,6 +402,19 @@ class App(ctk.CTk):
 
         alternate_handlers()
 
+    def contains_emoji_or_emote(self, text):
+        """Check if the text contains any emojis or known livestream emotes."""
+        
+        # Check for standard emojis using emoji library
+        if any(char in emoji.EMOJI_DATA for char in text):
+            return True
+
+        # Check for known text-based emotes
+        for emote in self.known_emotes:
+            if emote in text:
+                return True
+
+        return False
     def random_picker(self):
         input_files = [
             self.resource_path('../Data/Chat/General/input1.hana'),
@@ -415,6 +455,12 @@ class App(ctk.CTk):
             # Check if input begins with '!' and skip if it does
             if input_text.startswith('!'):
                 print("Skipping input text that begins with '!'.")
+                time.sleep(5)
+                continue
+
+            # Check if input text contains any emojis and skip if it does
+            if self.contains_emoji_or_emote(input_text):
+                print("Skipping input text that contains an emoji.")
                 time.sleep(5)
                 continue
 

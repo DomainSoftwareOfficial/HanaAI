@@ -43,12 +43,13 @@ class StartWindow(ctk.CTk):
         selected_output_device = self.dropdown_var3.get()
         selected_output_device_index = self.output_devices.index(selected_output_device) if selected_output_device in self.output_devices else None
 
+        # Ensure an output device index is selected (check it's not None)
+        if selected_output_device_index is None:
+            print("Error: No valid output device selected.")
+            return
+
         # Get the selected platform
         selected_platform = self.dropdown_var2.get()
-
-        # Cancel any scheduled tasks
-        if self.after_id is not None:
-            self.after_cancel(self.after_id)
 
         self.destroy()  # Close the start window
 
