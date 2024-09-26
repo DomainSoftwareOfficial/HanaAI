@@ -1,0 +1,14 @@
+Data/Chat/General/*
+Data/Chat/Special/*
+Data/Input/*
+Data/Output/*
+Environment/
+Assets/Audio/*
+Assets/Images/*
+Utilities/Models/*
+Utilities/__pycache__/
+App/__pycache__/
+Hooks/__pycache__/
+main.spec
+.env
+temp.txt
