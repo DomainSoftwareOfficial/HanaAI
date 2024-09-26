@@ -181,15 +181,14 @@ def tts_ja(text, speed_up_factor=1.2, output_path='../Assets/Audio/ai.wav', gain
         # Save the adjusted audio to a file
         louder_audio.export(output_path, format='wav')
 
-
 def list_microphones():
     microphones = []
     devices = sd.query_devices()
 
     for idx, device in enumerate(devices):
-        # Check if the device is an input device (microphone)
         if device['max_input_channels'] > 0:
-            microphones.append(f"{device['name']} (Index: {idx})")
+            # Append the name and its corresponding index as a tuple
+            microphones.append((device['name'], idx))
     
     return microphones
 
@@ -198,9 +197,9 @@ def list_output_devices():
     devices = sd.query_devices()
 
     for idx, device in enumerate(devices):
-        # Check if the device is an output device (speaker/headphone)
         if device['max_output_channels'] > 0:
-            output_devices.append(f"{device['name']} (Index: {idx})")
+            # Append the name and its corresponding index as a tuple
+            output_devices.append((device['name'], idx))
     
     return output_devices
 

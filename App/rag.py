@@ -1,5 +1,6 @@
-import subprocess
+import requests
 import urllib.parse
+import os
 
 class RAG:
     def __init__(self, params):
@@ -24,7 +25,8 @@ class RAG:
             "end": "\n10.",
             "max": "8000",
             "data": "",
-            "output_file": "../Data/Input/results.txt",
+            # Use os.path.join for Windows path compatibility
+            "output_file": os.path.join("..", "Data", "Input", "results.txt"),
         }
         
         for key, value in default_params.items():
@@ -35,13 +37,15 @@ class RAG:
             for key, value in self.params.items():
                 file.write(f"{key}: {value}\n")
 
-    def execute_command(self, command):
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, error = process.communicate()
-        if process.returncode == 0:
-            return output.decode("utf-8")
-        else:
-            return f"Error: {error.decode('utf-8')}"
+    def fetch_url_content(self, url):
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.text
+            else:
+                return f"Error: HTTP {response.status_code}"
+        except requests.RequestException as e:
+            return f"Error: {str(e)}"
 
     def get_context(self, query):
         if len(query) > 0:
@@ -49,9 +53,9 @@ class RAG:
             encoded_query = urllib.parse.quote(query)
             url = self.params["url"].replace("%q", encoded_query)
 
-        command = f"links -dump {url}"
-        search_context = self.execute_command(command)
+        search_context = self.fetch_url_content(url)
 
+        # Process the content based on 'start' and 'end' markers
         if len(self.params["start"]) > 0:
             start = search_context.find(self.params["start"])
             if start < 0:
@@ -66,11 +70,12 @@ class RAG:
                 end = int(self.params["max"])
         else:
             end = int(self.params["max"])
+
         search_context = search_context[:end]
         return search_context
 
-    def generate_prompt(self, input):
-        user_prompt = input
+    def generate_prompt(self, input_text):
+        user_prompt = input_text
 
         if self.params["activate"].lower() == "true":
             retrieved = self.get_context(user_prompt)
@@ -80,15 +85,20 @@ class RAG:
                 self.print_results(retrieved)
 
     def print_results(self, data):
+        # Ensure the directory exists before writing to it
+        output_dir = os.path.dirname(self.params["output_file"])
+        os.makedirs(output_dir, exist_ok=True)
+        
         with open(self.params["output_file"], 'w', encoding='utf-8') as file:
             file.write(data)
 
-def main():
-    params_file = '../Data/Input/parameters.txt'
+def mainrag():
+    # Ensure the directory for parameters exists on Windows
+    params_file = os.path.join("..", "Data", "Input", "parameters.txt")
     rag = RAG(params_file)
-    search_query = "MrBeast Controversy"
+    search_query = "Mouth Breathers"
     rag.generate_prompt(search_query)
     print(f"Results have been written to {rag.params['output_file']}")
 
 if __name__ == "__main__":
-    main()
+    mainrag()

@@ -7,6 +7,7 @@ import threading
 import whisper
 import logging
 import emoji
+import shutil
 from dotenv import load_dotenv
 from chloe import CWindow
 from hana import HWindow
@@ -46,7 +47,6 @@ class TextBoxFrame(ctk.CTkFrame):
         self.monitor_thread = threading.Thread(target=self.monitor_file, daemon=True)
         self.monitor_thread.start()
         
-
     def ensure_file_exists(self):
         try:
             if not os.path.exists(self.file_path):
@@ -99,7 +99,15 @@ class App(ctk.CTk):
 
         self.selected_mic_index = microphone_index
         self.selected_platform = selected_platform
-        self.output_device_index = output_device_index
+        self.selected_output_device_index = output_device_index
+
+        print(f"Playing audio on device index: {self.selected_output_device_index}")
+        print(f"Using services: {self.selected_platform}")
+        print(f"Inputting audio on device index: {self.selected_mic_index}")
+
+
+        self.folder_to_clear = self.resource_path('../Data/Output')
+        self.delete_all_files_in_folder(self.folder_to_clear)
 
         self.after_id = None
         self.youtube_handler = None
@@ -226,6 +234,33 @@ class App(ctk.CTk):
 
         self.stop_random_picker = threading.Event()
 
+    def delete_all_files_in_folder(self, folder_path):
+        """Delete all files in the specified folder."""
+        try:
+            # Check if the folder exists
+            if not os.path.exists(folder_path):
+                print(f"Folder '{folder_path}' does not exist.")
+                return
+
+            # List all files and directories in the folder
+            for file_name in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file_name)
+
+                # Check if it's a file or directory
+                if os.path.isfile(file_path):
+                    # Delete the file
+                    os.remove(file_path)
+                    print(f"Deleted file: {file_path}")
+                elif os.path.isdir(file_path):
+                    # Delete the directory and all its contents
+                    shutil.rmtree(file_path)
+                    print(f"Deleted directory: {file_path}")
+
+            print(f"All files in folder '{folder_path}' have been deleted.")
+
+        except Exception as e:
+            print(f"Error occurred while deleting files: {e}")
+
     def create_text_file(self, button_text):
         """Function to create a text file based on the button clicked."""
         folder_path = self.resource_path('../Data/Output')  # Replace with the actual folder path
@@ -266,7 +301,6 @@ class App(ctk.CTk):
         else:
             return 'en'
 
-    
     def start_recording(self):
         output_file = self.resource_path('../Assets/Audio/user.wav')
         self.is_recording.set()  # Set the event indicating recording is active
@@ -486,6 +520,11 @@ class App(ctk.CTk):
 
                 last_formatted_string = processed_string
 
+                # Write the processed string to a text file
+                output_file_path = self.resource_path('../Data/Output/output.hana')
+                with open(output_file_path, 'w', encoding='utf-8') as outfile:
+                    outfile.write(processed_string)
+
                 # Select the TTS function based on the active language switch or default to English
                 tts_function = self.get_active_tts_function() if any_switch_toggled else tts_en
 
@@ -501,7 +540,7 @@ class App(ctk.CTk):
                     print(f"Generated audio for picker: {hana_output_path}")
 
                     # Play the generated hana.wav file
-                    play(hana_output_path, self.output_device_index)
+                    play(hana_output_path, self.selected_output_device_index)
                 else:
                     print("No TTS function is active. Cannot generate audio.")
                     continue  # Skip if no TTS function is available
