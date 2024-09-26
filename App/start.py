@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
-from gui import App
-from audio import list_microphones, list_output_devices  
+from App.gui import App
+from App.audio import list_microphones, list_output_devices  
 
 class StartWindow(ctk.CTk):
     def __init__(self):

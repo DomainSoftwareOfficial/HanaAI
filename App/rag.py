@@ -1,6 +1,9 @@
 import requests
 import urllib.parse
 import os
+import subprocess
+import sys
+import shlex  # Import shlex for quoting shell arguments
 
 class RAG:
     def __init__(self, params):
@@ -25,37 +28,30 @@ class RAG:
             "end": "\n10.",
             "max": "8000",
             "data": "",
-            # Use os.path.join for Windows path compatibility
-            "output_file": os.path.join("..", "Data", "Input", "results.txt"),
+            # Use os.path.join for compatibility across operating systems
+            "output_file": resource_path('../Data/Input/results.txt'),
         }
         
         for key, value in default_params.items():
             self.params.setdefault(key, value)
 
     def save_params(self):
-        with open(self.params_file, 'w', encoding='utf-8') as file:
+        with open(self.params_file, "w", encoding="utf-8") as f:
             for key, value in self.params.items():
-                file.write(f"{key}: {value}\n")
-
-    def fetch_url_content(self, url):
-        try:
-            response = requests.get(url)
-            if response.status_code == 200:
-                return response.text
-            else:
-                return f"Error: HTTP {response.status_code}"
-        except requests.RequestException as e:
-            return f"Error: {str(e)}"
+                f.write(f"{key}: {value}\n")
 
     def get_context(self, query):
         if len(query) > 0:
-            # URL encode the query string to handle special characters
-            encoded_query = urllib.parse.quote(query)
-            url = self.params["url"].replace("%q", encoded_query)
+            # URL encode the query string
+            query = urllib.parse.quote(query)  # Properly encode the query
+            url = self.params["url"].replace("%q", query)
 
-        search_context = self.fetch_url_content(url)
+        # Safely quote the URL for shell execution
+        command = f"wsl links -dump {shlex.quote(url)}"  # Use shlex.quote to escape the URL
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+        output, _ = process.communicate()
+        search_context = output.decode("utf-8")
 
-        # Process the content based on 'start' and 'end' markers
         if len(self.params["start"]) > 0:
             start = search_context.find(self.params["start"])
             if start < 0:
@@ -70,7 +66,6 @@ class RAG:
                 end = int(self.params["max"])
         else:
             end = int(self.params["max"])
-
         search_context = search_context[:end]
         return search_context
 
@@ -83,7 +78,7 @@ class RAG:
                 self.params["data"] += retrieved
                 self.save_params()
                 self.print_results(retrieved)
-
+                
     def print_results(self, data):
         # Ensure the directory exists before writing to it
         output_dir = os.path.dirname(self.params["output_file"])
@@ -92,11 +87,19 @@ class RAG:
         with open(self.params["output_file"], 'w', encoding='utf-8') as file:
             file.write(data)
 
+def resource_path(relative_path):
+    """ Get the absolute path to the resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 def mainrag():
-    # Ensure the directory for parameters exists on Windows
-    params_file = os.path.join("..", "Data", "Input", "parameters.txt")
+    # Ensure the directory for parameters exists in Linux/WSL
+    params_file = resource_path('../Data/Input/parameters.txt')
     rag = RAG(params_file)
-    search_query = "Mouth Breathers"
+    search_query = "Mr Beast's Controversy"  # Query with a single quote
     rag.generate_prompt(search_query)
     print(f"Results have been written to {rag.params['output_file']}")
 
