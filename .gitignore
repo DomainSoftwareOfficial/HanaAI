@@ -8,6 +8,7 @@ Environment/
 Assets/Audio/*
 Assets/Images/*
 
+Utilities/LLMS/*
 Utilities/Models/*
 Utilities/__pycache__/
 
@@ -19,4 +20,4 @@ Build/
 
 setup.py
 .env
-temp.txt
+планы.txt

@@ -39,7 +39,7 @@ class CWindow(ctk.CTk):
     def on_close(self):
         self.destroy()
 
-def hana_ai(input):
+def chloe_ai(input):
     """Chloe AI logic with PyInstaller compatibility."""
     load_dotenv()
 

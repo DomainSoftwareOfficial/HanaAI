@@ -181,6 +181,73 @@ def tts_ja(text, speed_up_factor=1.2, output_path='../Assets/Audio/ai.wav', gain
         # Save the adjusted audio to a file
         louder_audio.export(output_path, format='wav')
 
+# Function to convert pydub AudioSegment to numpy array for librosa
+def audiosegment_to_np(audio_segment):
+    samples = np.array(audio_segment.get_array_of_samples())
+    if audio_segment.channels == 2:  # Stereo
+        samples = samples.reshape((-1, 2)).T
+    return samples.astype(np.float32) / np.iinfo(np.int16).max  # Normalize to [-1.0, 1.0]
+
+# Function to convert numpy array back to pydub AudioSegment
+def np_to_audiosegment(samples, sample_rate, sample_width, channels):
+    samples = (samples * np.iinfo(np.int16).max).astype(np.int16)  # De-normalize
+    if channels == 2:  # Stereo
+        samples = np.stack((samples[0], samples[1]), axis=-1)
+    return AudioSegment(
+        samples.tobytes(), 
+        frame_rate=sample_rate, 
+        sample_width=sample_width, 
+        channels=channels
+    )
+
+# Function to change the pitch of the audio without altering speed using librosa
+def pitch_shift_preserving_duration(sound, semitones):
+    samples = audiosegment_to_np(sound)
+    # Perform pitch shifting using librosa
+    shifted_samples = librosa.effects.pitch_shift(samples, sr=sound.frame_rate, n_steps=semitones)
+    
+    # Convert back to AudioSegment
+    return np_to_audiosegment(shifted_samples, sound.frame_rate, sound.sample_width, sound.channels)
+
+
+# Function to loop the static sound if the speech is longer
+def loop_static(static, speech_length):
+    loops = int(speech_length / len(static)) + 1  # Calculate how many times we need to loop
+    return static * loops
+
+def distort(speech_file_path, static_file_path, semitones=5, volume_reduction=0.2, final_output_reduction=0.8, output_file_path="output.wav"):
+    # Load the speech audio and static audio
+    speech = AudioSegment.from_file(speech_file_path)
+    static = AudioSegment.from_file(static_file_path)
+    
+    # Pitch shift the speech audio without altering the duration
+    pitched_speech = pitch_shift_preserving_duration(speech, semitones)
+    
+    # Loop the static file if the speech is longer
+    if len(pitched_speech) > len(static):
+        static = loop_static(static, len(pitched_speech))
+    
+    # Trim or pad the static to match the length of the speech
+    static = static[:len(pitched_speech)]
+    
+    # Adjust the volume of the static audio based on the reduction factor
+    if volume_reduction < 1.0:
+        db_reduction = 20 * np.log10(volume_reduction)
+        static = static + db_reduction  # Apply the calculated decibel reduction
+    
+    # Overlay the static on top of the pitched speech
+    combined = pitched_speech.overlay(static)
+    
+    # Reduce the volume of the final output by a factor of `final_output_reduction`
+    if final_output_reduction < 1.0:
+        final_db_reduction = 20 * np.log10(final_output_reduction)
+        combined = combined + final_db_reduction  # Reduce the volume of the final output
+    
+    # Export the resulting audio file
+    combined.export(output_file_path, format="wav")
+    print(f"Processed audio exported to {output_file_path}")
+
+
 def list_microphones():
     microphones = []
     devices = sd.query_devices()
@@ -324,4 +391,4 @@ def play(file_path, output_device_index=None):
 
         
 if __name__ == "__main__":
-    ensure_models_downloaded()
+    distort("../Assets/Audio/ai.wav", "../Assets/Audio/radio.mp3", output_file_path="../Assets/Audio/chloe.wav")

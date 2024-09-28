@@ -32,11 +32,11 @@ pycuda
 emoji
 sounddevice
 sox
-pyinstaller
 logger
 py-cpuinfo
 expecttest
 tensorboard
 tensorboard-data-server
 tensorboard-plugin-wit
+llama-cpp-python
 git+https://github.com/One-sixth/fairseq.git
