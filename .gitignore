@@ -10,6 +10,7 @@ Assets/Images/*
 
 Utilities/LLMS/*
 Utilities/Models/*
+Utilities/Miscellaneous/*
 Utilities/__pycache__/
 
 App/__pycache__/
@@ -18,6 +19,6 @@ Hooks/__pycache__/
 
 Build/
 
-setup.py
+Distribution/
+
 .env
-планы.txt
