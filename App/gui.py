@@ -24,6 +24,8 @@ from audio import tts_ja
 from audio import tts_ru
 from rvc import mainrvc
 from audio import play
+from rag import mainrag
+from model import load_model
 
 logging.getLogger("httpcore").setLevel(logging.CRITICAL)
 logging.getLogger("httpx").setLevel(logging.CRITICAL)
@@ -91,7 +93,7 @@ class TextBoxFrame(ctk.CTkFrame):
                 print(f"Error monitoring file changes: {e}")
 
 class App(ctk.CTk):
-    def __init__(self, microphone_index=None, output_device_index=None, selected_platform="None", selected_llm="None"):
+    def __init__(self, microphone_index=None, output_device_index=None, selected_platform="None", selected_llm=None):
         super().__init__()
 
         self.title("Control Panel")
@@ -127,6 +129,19 @@ class App(ctk.CTk):
         # Resolve the base path for PyInstaller
         self.base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 
+        self.selected_llm = selected_llm
+
+        # Load the selected LLM model if one is provided
+        if self.selected_llm:
+            print(f"Loading LLM model from: {self.selected_llm}")
+            self.llm_model = load_model(self.selected_llm)
+            if self.llm_model:
+                print("Model loaded successfully!")
+            else:
+                print("Failed to load the model.")
+        else:
+            print("No LLM model selected.")
+
         # Create a frame for the search bar at the top
         search_frame = ctk.CTkFrame(self)
         search_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
@@ -134,6 +149,13 @@ class App(ctk.CTk):
         # Create the search bar (CTkEntry)
         self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search...")
         self.search_entry.pack(fill="x", padx=10, pady=5)
+
+        # Variables to manage the timing and last printed text
+        self.last_printed_text = ""
+        self.after_id = None
+
+        # Bind the search entry's key release event to handle input changes
+        self.search_entry.bind("<KeyRelease>", self.on_search_change)
 
 
         # File paths (adjust these to match your directory structure)
@@ -243,6 +265,17 @@ class App(ctk.CTk):
 
         self.stop_random_picker = threading.Event()
 
+    def on_search_change(self, event):
+        # Cancel any existing scheduled print function
+        if self.after_id:
+            self.after_cancel(self.after_id)
+
+        # Get the current text from the search entry
+        current_text = self.search_entry.get()
+
+        # Schedule a new function to run after 2 seconds
+        self.after_id = self.after(2000, mainrag, current_text)
+        
     def delete_all_files_in_folder(self, folder_path):
         """Delete all files in the specified folder."""
         try:
@@ -540,7 +573,7 @@ class App(ctk.CTk):
             # Check if the current message is the same as the last one
             if formatted_string != last_formatted_string:
                 # Process the formatted string with hana_ai
-                processed_string = hana_ai(formatted_string)
+                processed_string = hana_ai(formatted_string, self.llm_model)
 
                 # Update HWindow if it's open
                 if self.hana_window and isinstance(self.hana_window, HWindow):

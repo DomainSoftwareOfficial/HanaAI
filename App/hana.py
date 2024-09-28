@@ -43,8 +43,10 @@ class HWindow(ctk.CTk):
             self.textbox.delete("1.0", tk.END)
             self.textbox.insert(tk.END, new_text)
 
-def hana_ai(input):
-    """Hana AI logic with PyInstaller compatibility."""
+def hana_ai(input_text, model=None):
+    """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
+
+    # Load environment variables (e.g., WebUI URL)
     load_dotenv()
 
     # Use resource_path to access files with PyInstaller compatibility
@@ -58,32 +60,52 @@ def hana_ai(input):
     with open(memory_path, "r", encoding='utf-8') as file:
         memory = file.read()
 
-    url = f"{os.getenv('Text-Generation')}/v1/completions"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "prompt": f"{instructions}\n{memory}\nYou: {input}\n\n### Response:\nHana Busujima:",
-        "mode": "chat-instruct",
-        "instruction_template": "ChatML",
-        "max_tokens": 512,
-    }
+    # Check if a model is provided, use it; otherwise, fallback to WebUI
+    if model is not None:
+        print("Local GGUF model is provided. Using the local model.")
+        try:
+            # Generate response using the local model
+            prompt = f"{instructions}\n{memory}\nYou: {input_text}\n\n### Response:\nHana Busujima:"
+            response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.9)  # Adjust as needed
 
-    response = requests.post(url, headers=headers, json=data, verify=False)
-    if response.status_code == 200:
-        # Ensure the response is properly decoded as UTF-8
-        results = json.loads(response.content.decode('utf-8'))["choices"][0]["text"]
-        new_result = results.replace("\n", "")
+            # Process the response
+            new_result = response['choices'][0]['text'].replace("\n", "")
+            new_result = re.sub(r'\*.*?\*', '', new_result)  # Remove text between asterisks
+            new_result = emoji.replace_emoji(new_result, replace='')  # Remove emojis
 
-        # Remove any text between asterisks (including the asterisks)
-        new_result = re.sub(r'\*.*?\*', '', new_result)
+            print(f"Hana said (via GGUF): {new_result}")
+            return new_result
+        except Exception as e:
+            print(f"Error using GGUF model: {e}")
+            return "Error using the local model. Please check the model setup."
+    
+    # If no local model is provided, fallback to WebUI
+    print("No local model provided. Falling back to WebUI.")
+    try:
+        url = f"{os.getenv('Text-Generation')}/v1/completions"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "prompt": f"{instructions}\n{memory}\nYou: {input_text}\n\n### Response:\nHana Busujima:",
+            "mode": "chat-instruct",
+            "instruction_template": "Alpaca",
+            "max_tokens": 512,
+        }
 
-        # Remove emojis
-        new_result = emoji.replace_emoji(new_result, replace='')
+        response = requests.post(url, headers=headers, json=data, verify=False)
+        if response.status_code == 200:
+            results = json.loads(response.content.decode('utf-8'))["choices"][0]["text"]
+            new_result = results.replace("\n", "")
+            new_result = re.sub(r'\*.*?\*', '', new_result)
+            new_result = emoji.replace_emoji(new_result, replace='')
 
-        print(f"Hana said: {new_result}")
-        return new_result
-    else:
-        print(f"Request failed with status code: {response.status_code}")
-        return "Someone flucked up. Please reset me before I decide to reset this machine!"
+            print(f"Hana said (via WebUI): {new_result}")
+            return new_result
+        else:
+            print(f"WebUI request failed with status code: {response.status_code}")
+            return "Failed to connect to WebUI."
+    except Exception as e:
+        print(f"Error connecting to WebUI: {e}")
+        return "WebUI connection error."
     
 def resource_path(relative_path):
     """ Get the absolute path to the resource, works for dev and for PyInstaller """

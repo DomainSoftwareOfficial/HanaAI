@@ -95,11 +95,10 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-def mainrag():
+def mainrag(search_query):
     # Ensure the directory for parameters exists in Linux/WSL
     params_file = resource_path('../Data/Input/parameters.txt')
     rag = RAG(params_file)
-    search_query = "Mr Beast's Controversy"  # Query with a single quote
     rag.generate_prompt(search_query)
     print(f"Results have been written to {rag.params['output_file']}")
 
