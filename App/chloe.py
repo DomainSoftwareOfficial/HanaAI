@@ -39,6 +39,13 @@ class CWindow(ctk.CTk):
     def on_close(self):
         self.destroy()
 
+    def update_textbox(self, new_text):
+        # Only update if the new_text is different from the current content
+        current_text = self.textbox.get("1.0", tk.END).strip()
+        if new_text != current_text:
+            self.textbox.delete("1.0", tk.END)
+            self.textbox.insert(tk.END, new_text)
+
 def chloe_ai(input_text, model=None):
     """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
 

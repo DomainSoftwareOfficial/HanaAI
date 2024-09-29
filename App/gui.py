@@ -251,6 +251,7 @@ class App(ctk.CTk):
         lower_frame.columnconfigure(1, weight=1)
 
         self.hana_window = None  # Reference to the HWindow
+        self.chloe_window = None
 
         # Example button to open additional windows
         open_window1_button = ctk.CTkButton(self, text="Open Chloe Chatter", command=self.open_window1, corner_radius=0)
@@ -526,8 +527,11 @@ class App(ctk.CTk):
             "What's your favorite movie?"
         ]
 
+        self.cycle_active = False  # Tracks if we are in the predefined-input cycle
+        self.predefined_input_flag = False  # Tracks if predefined input was chosen
+        output_chloe_path = self.resource_path('../Data/Output/output.chloe')  # Monitor file output
+
         last_formatted_string = None  # Initialize the variable
-        self.predefined_input_flag = False  # Initialize the flag
 
         while not self.stop_random_picker.is_set():  # Check if the stop event is set
             if self.is_recording.is_set():
@@ -538,46 +542,58 @@ class App(ctk.CTk):
 
             if self.pause_event.is_set():
                 print("Random picker is paused for Chloe AI processing.")
+                while self.pause_event.is_set():
+                    time.sleep(1)
 
-            # Check for the pause event
-            while self.pause_event.is_set():
-                time.sleep(1)
-            
-            if random.choice([True, False]):  # 50% chance to choose file or predefined string
-                index = random.randint(0, 2)
+            if self.cycle_active:
+                # Inside the cycle: 50/50 between monitor_file output or viewer input
+                if random.choice([True, False]) and os.path.exists(output_chloe_path):
+                    # Use monitor_file output
+                    with open(output_chloe_path, 'r', encoding='utf-8') as file:
+                        input_text = file.read().strip()
+                    viewer_text = "Chloe Hayashi"  # Label for AI-generated output
+                    self.predefined_input_flag = True  # Set flag for monitor_file to handle it again
+                else:
+                    index = random.randint(0, 2)
 
-                # Open the input files with UTF-8 encoding
-                with open(input_files[index], 'r', encoding='utf-8') as infile:
-                    input_text = infile.read().strip()
+                    # Open the input files with UTF-8 encoding
+                    with open(input_files[index], 'r', encoding='utf-8') as infile:
+                        input_text = infile.read().strip()
 
-                # Open the viewer files with UTF-8 encoding
-                with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
-                    viewer_text = viewerfile.read().strip()
+                    # Open the viewer files with UTF-8 encoding
+                    with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
+                        viewer_text = viewerfile.read().strip()
 
-                # Check for empty input and skip if empty
-                if not input_text:
-                    print("Skipping empty input text.")
-                    time.sleep(5)
-                    continue
+                    if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
+                        print(f"Skipping invalid or empty input: {input_text}")
+                        time.sleep(5)
+                        continue
 
-                # Check if input begins with '!' and skip if it does
-                if input_text.startswith('!'):
-                    print("Skipping input text that begins with '!'.")
-                    time.sleep(5)
-                    continue
+                    self.cycle_active = False  # Exit the cycle
 
-                # Check if input text contains any emojis and skip if it does
-                if self.contains_emoji_or_emote(input_text):
-                    print("Skipping input text that contains an emoji.")
-                    time.sleep(5)
-                    continue
-
-                self.predefined_input_flag = False  # Input is from a viewer file
             else:
-                # Choose from predefined input strings
-                input_text = random.choice(predefined_inputs)
-                viewer_text = "User"  # For predefined input, set a default viewer
-                self.predefined_input_flag = True  # Input is predefined
+                # Not in the cycle: Pick between predefined input or viewer input
+                if random.choice([True, False]):
+                    # Pick a predefined input
+                    input_text = random.choice(predefined_inputs)
+                    viewer_text = "User"
+                    self.predefined_input_flag = True
+                    self.cycle_active = True  # Start the cycle
+                else:
+                    index = random.randint(0, 2)
+
+                    # Open the input files with UTF-8 encoding
+                    with open(input_files[index], 'r', encoding='utf-8') as infile:
+                        input_text = infile.read().strip()
+
+                    # Open the viewer files with UTF-8 encoding
+                    with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
+                        viewer_text = viewerfile.read().strip()
+
+                    if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
+                        print(f"Skipping invalid or empty input: {input_text}")
+                        time.sleep(5)
+                        continue
 
             # Check if any language switches are toggled on
             any_switch_toggled = any([self.switch_en.get(), self.switch_es.get(), self.switch_ru.get(), self.switch_jp.get()])
@@ -619,10 +635,13 @@ class App(ctk.CTk):
                     hana_output_path = self.resource_path('../Assets/Audio/hana.wav')
                     mainrvc(ai_output_path, hana_output_path)
 
-                    print(f"Generated audio for picker: {hana_output_path}")
+                    # **Clear the HWindow text after hana.wav is created**
+                    if self.hana_window and isinstance(self.hana_window, HWindow):
+                        self.hana_window.update_textbox("")  # Clear the text
 
                     # Notify monitor_file that a new file is ready
                     if self.predefined_input_flag:
+                        print("Running Monitor_File")
                         self.new_file_ready_event.set()
                         self.predefined_input_flag = False
 
@@ -644,65 +663,62 @@ class App(ctk.CTk):
         chloe_file_path = self.resource_path('../Data/Output/output.hana')
         log_file_path = self.resource_path('../Data/Output/output.chloe')
 
-        # Wait for the file to exist before proceeding
         while not os.path.exists(chloe_file_path) and not self.stop_monitor_file.is_set():
             time.sleep(1)
 
         while not self.stop_monitor_file.is_set():
             while not self.new_file_ready_event.is_set():
-                time.sleep(1)# Wait for signal from random_picker
+                time.sleep(1)
 
             if self.stop_monitor_file.is_set():
                 print("Stopping monitor_file as stop signal is set.")
                 break
 
-            # Pause random_picker
             print("Pausing random_picker...")
             self.pause_event.set()
 
             try:
-                # Open and read the Chloe output file
                 with open(chloe_file_path, 'r', encoding='utf-8') as file:
                     chloe_text = file.read().strip()
 
                 if chloe_text:
-                    print(f"Processing Chloe text: {chloe_text}")
-                    processed_chloe_text = chloe_ai(chloe_text, self.llm_model)
+                    raw_chloe_text = f"System: Hana Busujima asks {chloe_text}"
 
-                    # Write the processed Chloe text to the log file
+                    if self.chloe_window and isinstance(self.chloe_window, CWindow):
+                        self.chloe_window.update_textbox(raw_chloe_text)
+
+                    processed_chloe_text = chloe_ai(raw_chloe_text, self.llm_model)
+
                     with open(log_file_path, 'w', encoding='utf-8') as file:
                         file.write(f"{processed_chloe_text}\n")
 
-                    # Handle TTS
                     tts_function = self.get_active_tts_function()
                     if tts_function:
                         ai_output_path = self.resource_path('../Assets/Audio/ai.wav')
-                        print(f"Generating audio file at {ai_output_path}...")
                         tts_function(processed_chloe_text, output_path=ai_output_path)
 
-                        # Distort the generated audio and output it
                         distorted_output_path = self.resource_path('../Assets/Audio/chloe.wav')
                         static_file_path = self.resource_path('../Assets/Audio/radio.mp3')
                         distort(ai_output_path, static_file_path, output_file_path=distorted_output_path)
 
+                        if self.chloe_window and isinstance(self.chloe_window, CWindow):
+                            self.chloe_window.update_textbox("")  # Clear the text
+
                         print(f"Generated distorted audio for Chloe: {distorted_output_path}")
                     else:
                         print("No TTS function is active. Skipping audio generation.")
+
+                    # Signal to random_picker that the cycle can continue
+                    self.new_file_ready_event.set()
                 else:
                     print(f"File {chloe_file_path} was empty, skipping processing.")
-
             except Exception as e:
                 print(f"Error processing Chloe file: {str(e)}")
-
             finally:
-                # Resume random_picker
                 print("Resuming random_picker...")
-                self.pause_event.clear()  # Allow random_picker to continue
-
-                # Reset the new file ready event
+                self.pause_event.clear()
                 self.new_file_ready_event.clear()
 
-            # Small delay before checking for the next file
             time.sleep(5)
 
         print("Exiting monitor_file thread.")
@@ -720,8 +736,8 @@ class App(ctk.CTk):
         return os.path.join(base_path, relative_path)
 
     def open_window1(self):
-        window1 = CWindow()
-        window1.mainloop()
+        self.chloe_window = CWindow()
+        self.chloe_window.mainloop()
 
     def open_window2(self):
         self.hana_window = HWindow(self)  # Pass the reference of App to HWindow

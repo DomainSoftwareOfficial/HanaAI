@@ -65,7 +65,7 @@ def hana_ai(input_text, model=None):
         print("Local GGUF model is provided. Using the local model.")
         try:
             # Generate response using the local model
-            prompt = f"{instructions}\n{memory}\nYou: {input_text}\n\n### Response:\nHana Busujima:"
+            prompt = f"{instructions}\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
             response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.9)  # Adjust as needed
 
             # Process the response
