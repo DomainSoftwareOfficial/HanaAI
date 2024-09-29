@@ -125,6 +125,9 @@ class App(ctk.CTk):
         # Resolve the base path for PyInstaller
         self.base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 
+        # Initialize LLM model to None
+        self.llm_model = None
+
         self.selected_llm = selected_llm
 
         # Load the selected LLM model if one is provided
@@ -520,11 +523,11 @@ class App(ctk.CTk):
         ]
 
         predefined_inputs = [
-            "What is the meaning of life?",
-            "Tell me a joke.",
-            "What's the weather like?",
-            "Can you explain quantum mechanics?",
-            "What's your favorite movie?"
+            "Go on a tangent about humans or your life",
+            "Say something controversial (it's a joke though)",
+            "Make a joke about corperate (Either about Joykill, Joystick Studios, Domain Software, or some other company)",
+            "Say something that involves you swearing",
+            "Go on a tangent about an unrelated topic" 
         ]
 
         self.cycle_active = False  # Tracks if we are in the predefined-input cycle

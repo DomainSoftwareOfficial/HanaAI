@@ -52,21 +52,30 @@ def hana_ai(input_text, model=None):
     # Use resource_path to access files with PyInstaller compatibility
     instructions_path = resource_path("../Data/Input/profile.hana")
     memory_path = resource_path("../Data/Input/memory.txt")
+    rag_path = resource_path("../Data/Input/results.txt")
 
     # Ensure files are read with UTF-8 encoding
     with open(instructions_path, "r", encoding='utf-8') as file:
         instructions = file.read()
 
+    # Split the instructions into two parts: the first four lines and the rest
+    instructions_lines = instructions.splitlines()
+    instructions_pt1 = "\n".join(instructions_lines[:4])  # First four lines
+    instructions_pt2 = "\n".join(instructions_lines[4:])  # The rest
+
     with open(memory_path, "r", encoding='utf-8') as file:
         memory = file.read()
+
+    with open(rag_path, "r", encoding='utf-8') as file:
+        rag = file.read()
 
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:
         print("Local GGUF model is provided. Using the local model.")
         try:
             # Generate response using the local model
-            prompt = f"{instructions}\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
-            response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.9)  # Adjust as needed
+            prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
+            response = model(prompt, max_tokens=100, temperature=0.6, top_p=0.9)  # Adjust as needed
 
             # Process the response
             new_result = response['choices'][0]['text'].replace("\n", "")
@@ -85,7 +94,7 @@ def hana_ai(input_text, model=None):
         url = f"{os.getenv('Text-Generation')}/v1/completions"
         headers = {"Content-Type": "application/json"}
         data = {
-            "prompt": f"{instructions}\n{memory}\nYou: {input_text}\n\n### Response:\nHana Busujima:",
+            "prompt": prompt,
             "mode": "chat-instruct",
             "instruction_template": "Alpaca",
             "max_tokens": 512,

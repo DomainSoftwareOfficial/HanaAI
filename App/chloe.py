@@ -54,10 +54,14 @@ def chloe_ai(input_text, model=None):
 
     # Use resource_path to access files with PyInstaller compatibility
     instructions_path = resource_path("../Data/Input/profile.chloe")
+    rag_path = resource_path("../Data/Input/results.txt")
 
     # Ensure files are read with UTF-8 encoding
     with open(instructions_path, "r", encoding='utf-8') as file:
         instructions = file.read()
+
+    with open(rag_path, "r", encoding='utf-8') as file:
+        rag = file.read()
 
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:
@@ -65,7 +69,7 @@ def chloe_ai(input_text, model=None):
         try:
             # Generate response using the local model
             prompt = f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:"
-            response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.9)  # Adjust as needed
+            response = model(prompt, max_tokens=100, temperature=0.6, top_p=0.9)  # Adjust as needed
 
             # Process the response
             new_result = response['choices'][0]['text'].replace("\n", "")
