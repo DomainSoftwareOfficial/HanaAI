@@ -9,23 +9,23 @@ import logging
 import emoji
 import shutil
 from dotenv import load_dotenv
-from App.chloe import CWindow
-from App.hana import HWindow
-from App.hana import hana_ai
-from App.chloe import chloe_ai
-from App.chat import YouTubeChatHandler
-from App.chat import TwitchChatHandler
-from App.audio import translate
-from App.audio import record_audio
-from App.audio import distort
-from App.audio import tts_en
-from App.audio import tts_es
-from App.audio import tts_ja
-from App.audio import tts_ru
-from App.rvc import mainrvc
-from App.audio import play
-from App.rag import mainrag
-from App.model import load_model
+from chloe import CWindow
+from hana import HWindow
+from hana import hana_ai
+from chloe import chloe_ai
+from chat import YouTubeChatHandler
+from chat import TwitchChatHandler
+from audio import translate
+from audio import record_audio
+from audio import distort
+from audio import tts_en
+from audio import tts_es
+from audio import tts_ja
+from audio import tts_ru
+from rvc import mainrvc
+from audio import play
+from rag import mainrag
+from model import load_model
 
 logging.getLogger("httpcore").setLevel(logging.CRITICAL)
 logging.getLogger("httpx").setLevel(logging.CRITICAL)
@@ -113,15 +113,11 @@ class App(ctk.CTk):
         self.folder_to_clear = self.resource_path('../Data/Output')
         self.delete_all_files_in_folder(self.folder_to_clear)
 
-        self.pause_event = threading.Event()  # Event to pause/resume random_picker
-        self.chloe_event = threading.Event()  # Event to signal Chloe monitoring
-        self.stop_chloe_event = threading.Event()  # Event to signal stopping Chloe
-
-
         self.after_id = None
         self.youtube_handler = None
         self.twitch_handler = None
         self.picker_thread = None
+        self.monitor_thread = None
         self.handler_thread = None
 
         self.known_emotes = []
@@ -264,6 +260,9 @@ class App(ctk.CTk):
         open_window2_button.grid(row=6, column=1, padx=10, pady=10, sticky="ew")
 
         self.stop_random_picker = threading.Event()
+        self.stop_monitor_file = threading.Event()
+        self.pause_event = threading.Event()
+        self.new_file_ready_event = threading.Event()
 
     def on_search_change(self, event):
         # Cancel any existing scheduled print function
@@ -432,16 +431,19 @@ class App(ctk.CTk):
         print("Random picker stopped. Chat handlers still running.")
 
     def chloe_start(self):
-        self.stop_chloe_event.clear()  # Clear any stop events
-        self.pause_event.clear()       # Clear pause event to allow random_picker to run
-        threading.Thread(target=self.monitor_file, daemon=True).start()
-        threading.Thread(target=self.random_picker, daemon=True).start()
-        print("Chloe AI monitoring and random picker started.")
+        # Clear any stop signals and start the monitoring thread
+        self.stop_monitor_file.clear()  # Clear the stop event (make sure it's not set)
+        self.pause_event.clear()        # Ensure the pause event is clear
+        self.monitor_thread = threading.Thread(target=self.monitor_file, daemon=True)
+        self.monitor_thread.start()     # Start the monitoring thread
+        print("Chloe AI monitoring started.")
 
     def chloe_stop(self):
-        print("Stopping Chloe monitoring...")
-        self.stop_chloe_event.set()  # Signal to stop the monitoring thread
-        self.pause_event.clear()
+        # Set the stop signal and clear any pause event to ensure the monitor stops cleanly
+        self.stop_monitor_file.set()  # Signal to stop the monitoring thread
+        self.new_file_ready_event.set()  # Unblock monitor if waiting
+        self.pause_event.clear()      # Ensure the pause event is clear
+        print("Stopping Chloe AI monitoring...")
 
     def start_youtube_chat(self):
         load_dotenv()
@@ -572,12 +574,13 @@ class App(ctk.CTk):
 
             # Check if the current message is the same as the last one
             if formatted_string != last_formatted_string:
-                # Process the formatted string with hana_ai
-                processed_string = hana_ai(formatted_string, self.llm_model)
 
                 # Update HWindow if it's open
                 if self.hana_window and isinstance(self.hana_window, HWindow):
-                    self.hana_window.update_textbox(processed_string)
+                    self.hana_window.update_textbox(formatted_string)
+
+                # Process the formatted string with hana_ai
+                processed_string = hana_ai(formatted_string, self.llm_model)
 
                 last_formatted_string = processed_string
 
@@ -600,6 +603,11 @@ class App(ctk.CTk):
 
                     print(f"Generated audio for picker: {hana_output_path}")
 
+                    # Notify monitor_file that a new file is ready
+                    self.new_file_ready_event.set()
+
+                    time.sleep(3)
+
                     # Play the generated hana.wav file
                     # play(hana_output_path, self.selected_output_device_index)
                 else:
@@ -617,79 +625,70 @@ class App(ctk.CTk):
         log_file_path = self.resource_path('../Data/Output/output.chloe')
 
         # Wait for the file to exist before proceeding
-        while not os.path.exists(chloe_file_path):
-            print(f"File {chloe_file_path} not found. Retrying in 1 second...")
+        while not os.path.exists(chloe_file_path) and not self.stop_monitor_file.is_set():
             time.sleep(1)
 
-        last_modified_time = os.path.getmtime(chloe_file_path)
+        while not self.stop_monitor_file.is_set():
+            # Wait for the new file to be processed by random_picker
+            print("Waiting for new file from random_picker...")
+            self.new_file_ready_event.wait # Wait for signal from random_picker
 
-        while not self.stop_chloe_event.is_set():  # Check if Chloe monitoring is stopped
+            if self.stop_monitor_file.is_set():
+                print("Stopping monitor_file as stop signal is set.")
+                break
 
-            # Wait for the file to exist in case it was deleted
-            if not os.path.exists(chloe_file_path):
-                print(f"File {chloe_file_path} not found. Waiting...")
-                time.sleep(1)
-                continue
+            # Pause random_picker
+            print("Pausing random_picker...")
+            self.pause_event.set()
 
-            current_modified_time = os.path.getmtime(chloe_file_path)
+            try:
+                # Open and read the Chloe output file
+                with open(chloe_file_path, 'r', encoding='utf-8') as file:
+                    chloe_text = file.read().strip()
 
-            # Check if the file has been modified
-            if current_modified_time != last_modified_time:
-                print("Change detected in Chloe file.")
+                if chloe_text:
+                    print(f"Processing Chloe text: {chloe_text}")
+                    processed_chloe_text = chloe_ai(chloe_text, self.llm_model)
 
-                # Step 1: Pause random_picker
-                print("Pausing random_picker...")
-                self.pause_event.set()  # This should pause the random_picker
+                    # Write the processed Chloe text to the log file
+                    with open(log_file_path, 'w', encoding='utf-8') as file:
+                        file.write(f"{processed_chloe_text}\n")
 
-                try:
-                    # Step 2: Process the file with chloe_ai
-                    with open(chloe_file_path, 'r', encoding='utf-8') as file:
-                        chloe_text = file.read().strip()
+                    # Handle TTS
+                    tts_function = self.get_active_tts_function()
+                    if tts_function:
+                        ai_output_path = self.resource_path('../Assets/Audio/ai.wav')
+                        print(f"Generating audio file at {ai_output_path}...")
+                        tts_function(processed_chloe_text, output_path=ai_output_path)
 
-                    if chloe_text:
-                        print(f"Processing Chloe text: {chloe_text}")
-                        # Process with Chloe AI and get the output string
-                        processed_chloe_text = chloe_ai(chloe_text)
+                        # Distort the generated audio and output it
+                        distorted_output_path = self.resource_path('../Assets/Audio/chloe.wav')
+                        static_file_path = self.resource_path('../Assets/Audio/radio.mp3')
+                        distort(ai_output_path, static_file_path, output_file_path=distorted_output_path)
 
-                        # Log chloe_ai output to a file
-                        with open(log_file_path, 'w', encoding='utf-8') as file:
-                            file.write(f"Original: {chloe_text}\nProcessed: {processed_chloe_text}\n")
-
-                        # Step 3: Determine which TTS function to use (like random_picker)
-                        tts_function = self.get_active_tts_function()  # Use TTS based on active switches
-
-                        if tts_function:
-                            # Generate the audio file using the selected TTS function
-                            ai_output_path = self.resource_path('../Assets/Audio/ai_chloe.wav')
-                            print(f"Generating audio file at {ai_output_path}...")
-                            tts_function(processed_chloe_text, output_path=ai_output_path)
-
-                            # Process the audio file with mainrvc and save as chloe.wav
-                            chloe_output_path = self.resource_path('../Assets/Audio/chloe.wav')
-                            mainrvc(ai_output_path, chloe_output_path)
-
-                            print(f"Generated audio for Chloe: {chloe_output_path}")
-
-                            # Optionally play the generated audio file
-                            # play(chloe_output_path, self.selected_output_device_index)
-                        else:
-                            print("No TTS function is active. Skipping audio generation.")
+                        print(f"Generated distorted audio for Chloe: {distorted_output_path}")
                     else:
-                        print("Chloe file was empty, skipping processing.")
+                        print("No TTS function is active. Skipping audio generation.")
+                else:
+                    print(f"File {chloe_file_path} was empty, skipping processing.")
 
-                except Exception as e:
-                    print(f"Error processing Chloe file: {str(e)}")
+            except Exception as e:
+                print(f"Error processing Chloe file: {str(e)}")
 
-                finally:
-                    # Step 4: Resume random_picker
-                    print("Resuming random_picker...")
-                    self.pause_event.clear()  # Allow random_picker to resume
+            finally:
+                # Resume random_picker
+                print("Resuming random_picker...")
+                self.pause_event.clear()  # Allow random_picker to continue
 
-                    # Update the last modification time
-                    last_modified_time = current_modified_time
+                # Reset the new file ready event
+                self.new_file_ready_event.clear()
 
-            # Wait 5 seconds after random_picker resumes, then start monitoring again
+            # Small delay before checking for the next file
             time.sleep(5)
+
+        print("Exiting monitor_file thread.")
+
+
 
     def resource_path(self, relative_path):
         """ Get the absolute path to the resource, works for dev and for PyInstaller """

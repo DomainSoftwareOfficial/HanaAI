@@ -39,47 +39,65 @@ class CWindow(ctk.CTk):
     def on_close(self):
         self.destroy()
 
-def chloe_ai(input):
-    """Chloe AI logic with PyInstaller compatibility."""
+def chloe_ai(input_text, model=None):
+    """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
+
+    # Load environment variables (e.g., WebUI URL)
     load_dotenv()
 
     # Use resource_path to access files with PyInstaller compatibility
     instructions_path = resource_path("../Data/Input/profile.chloe")
-    memory_path = resource_path("../Data/Input/memory.txt")
 
     # Ensure files are read with UTF-8 encoding
     with open(instructions_path, "r", encoding='utf-8') as file:
         instructions = file.read()
 
-    with open(memory_path, "r", encoding='utf-8') as file:
-        memory = file.read()
+    # Check if a model is provided, use it; otherwise, fallback to WebUI
+    if model is not None:
+        print("Local GGUF model is provided. Using the local model.")
+        try:
+            # Generate response using the local model
+            prompt = f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:"
+            response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.9)  # Adjust as needed
 
-    url = f"{os.getenv('Text-Generation')}/v1/completions"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "prompt": f"{instructions}\n{memory}\nYou: {input}\n\n### Response:\nHana Busujima:",
-        "mode": "chat-instruct",
-        "instruction_template": "ChatML",
-        "max_tokens": 512,
-    }
+            # Process the response
+            new_result = response['choices'][0]['text'].replace("\n", "")
+            new_result = re.sub(r'\*.*?\*', '', new_result)  # Remove text between asterisks
+            new_result = emoji.replace_emoji(new_result, replace='')  # Remove emojis
 
-    response = requests.post(url, headers=headers, json=data, verify=False)
-    if response.status_code == 200:
-        # Ensure the response is properly decoded as UTF-8
-        results = json.loads(response.content.decode('utf-8'))["choices"][0]["text"]
-        new_result = results.replace("\n", "")
+            print(f"Chloe said (via GGUF): {new_result}")
+            return new_result
+        except Exception as e:
+            print(f"Error using GGUF model: {e}")
+            return "Error using the local model. Please check the model setup."
+    
+    # If no local model is provided, fallback to WebUI
+    print("No local model provided. Falling back to WebUI.")
+    try:
+        url = f"{os.getenv('Text-Generation')}/v1/completions"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "prompt": f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:",
+            "mode": "chat-instruct",
+            "instruction_template": "Alpaca",
+            "max_tokens": 512,
+        }
 
-        # Remove any text between asterisks (including the asterisks)
-        new_result = re.sub(r'\*.*?\*', '', new_result)
+        response = requests.post(url, headers=headers, json=data, verify=False)
+        if response.status_code == 200:
+            results = json.loads(response.content.decode('utf-8'))["choices"][0]["text"]
+            new_result = results.replace("\n", "")
+            new_result = re.sub(r'\*.*?\*', '', new_result)
+            new_result = emoji.replace_emoji(new_result, replace='')
 
-        # Remove emojis
-        new_result = emoji.replace_emoji(new_result, replace='')
-
-        print(f"Chloe said: {new_result}")
-        return new_result
-    else:
-        print(f"Request failed with status code: {response.status_code}")
-        return "Server's down! Please fix."
+            print(f"Chloe said (via WebUI): {new_result}")
+            return new_result
+        else:
+            print(f"WebUI request failed with status code: {response.status_code}")
+            return "Failed to connect to WebUI."
+    except Exception as e:
+        print(f"Error connecting to WebUI: {e}")
+        return "WebUI connection error."
 
 def resource_path(relative_path):
     """ Get the absolute path to the resource, works for dev and for PyInstaller """
