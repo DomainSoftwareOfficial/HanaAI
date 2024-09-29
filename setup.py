@@ -7,11 +7,16 @@ def build():
     current_dir = os.getcwd()  # Get current working directory
     dist_path = os.path.join(current_dir, 'Distribution')  # Specify your distribution directory
     build_path = os.path.join(current_dir, 'Build')  # Specify your build directory
-    spec_path = '.\\Utilities\\Miscellaneous'
+    spec_path = os.path.join(current_dir, 'Utilities', 'Miscellaneous')  # Ensure the spec_path is correct
 
-    # Define the PyInstaller command
+    # Activate the virtual environment
+    venv_path = os.path.join(current_dir, 'Environment')  # Adjust this to the path of your virtual environment
+    python_executable = os.path.join(venv_path, 'Scripts', 'python.exe')
+    
+    # Define the PyInstaller command using the Python from the venv
     pyinstaller_command = [
-        'pyinstaller',
+        python_executable,
+        '-m', 'PyInstaller',
         '--onefile',
         '--windowed' if sys.platform == "win32" else '',
         '--name', 'stream',

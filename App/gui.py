@@ -518,7 +518,16 @@ class App(ctk.CTk):
             self.resource_path('../Data/Chat/General/viewer3.hana')
         ]
 
+        predefined_inputs = [
+            "What is the meaning of life?",
+            "Tell me a joke.",
+            "What's the weather like?",
+            "Can you explain quantum mechanics?",
+            "What's your favorite movie?"
+        ]
+
         last_formatted_string = None  # Initialize the variable
+        self.predefined_input_flag = False  # Initialize the flag
 
         while not self.stop_random_picker.is_set():  # Check if the stop event is set
             if self.is_recording.is_set():
@@ -527,39 +536,48 @@ class App(ctk.CTk):
                 time.sleep(1)  # Small sleep to prevent busy-waiting
                 continue
 
-            # Check for the pause event
             if self.pause_event.is_set():
                 print("Random picker is paused for Chloe AI processing.")
-                self.pause_event.wait()  # This will block until the pause_event is cleared
-                print("Random picker resumed.")
 
-            index = random.randint(0, 2)
+            # Check for the pause event
+            while self.pause_event.is_set():
+                time.sleep(1)
+            
+            if random.choice([True, False]):  # 50% chance to choose file or predefined string
+                index = random.randint(0, 2)
 
-            # Open the input files with UTF-8 encoding
-            with open(input_files[index], 'r', encoding='utf-8') as infile:
-                input_text = infile.read().strip()
+                # Open the input files with UTF-8 encoding
+                with open(input_files[index], 'r', encoding='utf-8') as infile:
+                    input_text = infile.read().strip()
 
-            # Open the viewer files with UTF-8 encoding
-            with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
-                viewer_text = viewerfile.read().strip()
+                # Open the viewer files with UTF-8 encoding
+                with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
+                    viewer_text = viewerfile.read().strip()
 
-            # Check for empty input and skip if empty
-            if not input_text:
-                print("Skipping empty input text.")
-                time.sleep(5)
-                continue
+                # Check for empty input and skip if empty
+                if not input_text:
+                    print("Skipping empty input text.")
+                    time.sleep(5)
+                    continue
 
-            # Check if input begins with '!' and skip if it does
-            if input_text.startswith('!'):
-                print("Skipping input text that begins with '!'.")
-                time.sleep(5)
-                continue
+                # Check if input begins with '!' and skip if it does
+                if input_text.startswith('!'):
+                    print("Skipping input text that begins with '!'.")
+                    time.sleep(5)
+                    continue
 
-            # Check if input text contains any emojis and skip if it does
-            if self.contains_emoji_or_emote(input_text):
-                print("Skipping input text that contains an emoji.")
-                time.sleep(5)
-                continue
+                # Check if input text contains any emojis and skip if it does
+                if self.contains_emoji_or_emote(input_text):
+                    print("Skipping input text that contains an emoji.")
+                    time.sleep(5)
+                    continue
+
+                self.predefined_input_flag = False  # Input is from a viewer file
+            else:
+                # Choose from predefined input strings
+                input_text = random.choice(predefined_inputs)
+                viewer_text = "User"  # For predefined input, set a default viewer
+                self.predefined_input_flag = True  # Input is predefined
 
             # Check if any language switches are toggled on
             any_switch_toggled = any([self.switch_en.get(), self.switch_es.get(), self.switch_ru.get(), self.switch_jp.get()])
@@ -604,7 +622,9 @@ class App(ctk.CTk):
                     print(f"Generated audio for picker: {hana_output_path}")
 
                     # Notify monitor_file that a new file is ready
-                    self.new_file_ready_event.set()
+                    if self.predefined_input_flag:
+                        self.new_file_ready_event.set()
+                        self.predefined_input_flag = False
 
                     time.sleep(3)
 
@@ -629,9 +649,8 @@ class App(ctk.CTk):
             time.sleep(1)
 
         while not self.stop_monitor_file.is_set():
-            # Wait for the new file to be processed by random_picker
-            print("Waiting for new file from random_picker...")
-            self.new_file_ready_event.wait # Wait for signal from random_picker
+            while not self.new_file_ready_event.is_set():
+                time.sleep(1)# Wait for signal from random_picker
 
             if self.stop_monitor_file.is_set():
                 print("Stopping monitor_file as stop signal is set.")
