@@ -63,12 +63,13 @@ def chloe_ai(input_text, model=None):
     with open(rag_path, "r", encoding='utf-8') as file:
         rag = file.read()
 
+    prompt = f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:"
+
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:
         print("Local GGUF model is provided. Using the local model.")
         try:
             # Generate response using the local model
-            prompt = f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:"
             response = model(prompt, max_tokens=100, temperature=0.6, top_p=0.9)  # Adjust as needed
 
             # Process the response
@@ -91,7 +92,8 @@ def chloe_ai(input_text, model=None):
             "prompt": f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:",
             "mode": "chat-instruct",
             "instruction_template": "Alpaca",
-            "max_tokens": 512,
+            "temperature": 0.6,
+            "max_tokens": 100,
         }
 
         response = requests.post(url, headers=headers, json=data, verify=False)

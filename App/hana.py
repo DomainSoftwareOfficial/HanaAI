@@ -69,12 +69,12 @@ def hana_ai(input_text, model=None):
     with open(rag_path, "r", encoding='utf-8') as file:
         rag = file.read()
 
+    prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
+
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:
         print("Local GGUF model is provided. Using the local model.")
         try:
-            # Generate response using the local model
-            prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
             response = model(prompt, max_tokens=100, temperature=0.6, top_p=0.9)  # Adjust as needed
 
             # Process the response
@@ -97,7 +97,7 @@ def hana_ai(input_text, model=None):
             "prompt": prompt,
             "mode": "chat-instruct",
             "instruction_template": "Alpaca",
-            "max_tokens": 512,
+            "max_tokens": 100,
         }
 
         response = requests.post(url, headers=headers, json=data, verify=False)

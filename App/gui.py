@@ -34,6 +34,7 @@ logging.getLogger("numba").setLevel(logging.CRITICAL)
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 logging.getLogger("gtts").setLevel(logging.CRITICAL)
 
+
 class TextBoxFrame(ctk.CTkFrame):
     def __init__(self, parent, file_path):
         super().__init__(parent)
@@ -320,7 +321,7 @@ class App(ctk.CTk):
 
         try:
             # Write content to the file
-            with open(file_name, "w") as file:
+            with open(file_name, "w", encoding='utf-8') as file:
                 file.write(file_contents[button_text])
 
             # Show a confirmation message
@@ -467,6 +468,15 @@ class App(ctk.CTk):
         self.twitch_handler = TwitchChatHandler(token=token, client_id=client_id, nick=nick, prefix=prefix, initial_channels=initial_channels, mod_names=mod_names)
         self.twitch_handler.run()
 
+    def is_valid_utf8(self, text):
+        """Check if the text can be properly decoded as UTF-8."""
+        try:
+            text.encode('utf-8').decode('utf-8')  # Attempt to encode and decode
+            return True
+        except UnicodeDecodeError as e:
+            logging.error(f"Unicode decode error: {e}. Problematic text: {text}")
+            return False
+
     def start_alternating_handlers(self):
         load_dotenv()
         video_id = os.getenv('Video-Url')
@@ -567,6 +577,11 @@ class App(ctk.CTk):
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
 
+                    # Before processing the input_text, validate if it's a proper UTF-8 string
+                    if not self.is_valid_utf8(input_text):
+                        print(f"Skipping invalid UTF-8 input: {input_text}")
+                        continue  # Skip this iteration if the input text has encoding issues
+
                     if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
                         print(f"Skipping invalid or empty input: {input_text}")
                         time.sleep(5)
@@ -592,6 +607,11 @@ class App(ctk.CTk):
                     # Open the viewer files with UTF-8 encoding
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
+
+                    # Before processing the input_text, validate if it's a proper UTF-8 string
+                    if not self.is_valid_utf8(input_text):
+                        print(f"Skipping invalid UTF-8 input: {input_text}")
+                        continue  # Skip this iteration if the input text has encoding issues
 
                     if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
                         print(f"Skipping invalid or empty input: {input_text}")
