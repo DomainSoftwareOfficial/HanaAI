@@ -52,6 +52,8 @@ def chloe_ai(input_text, model=None):
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
 
+    chat_set = os.getenv('Instruction-Set')
+
     # Use resource_path to access files with PyInstaller compatibility
     instructions_path = resource_path("../Data/Input/profile.chloe")
     rag_path = resource_path("../Data/Input/results.txt")
@@ -60,10 +62,18 @@ def chloe_ai(input_text, model=None):
     with open(instructions_path, "r", encoding='utf-8') as file:
         instructions = file.read()
 
+    # Split the instructions into two parts: the first four lines and the rest
+    instructions_lines = instructions.splitlines()
+    instructions_pt1 = "\n".join(instructions_lines[:4])  # First four lines
+    instructions_pt2 = "\n".join(instructions_lines[4:])  # The rest
+
     with open(rag_path, "r", encoding='utf-8') as file:
         rag = file.read()
 
-    prompt = f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:"
+    if chat_set == 'Alpaca':
+        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{input_text}\n\n### Response:\nChloe Hayashi:"
+    elif chat_set == 'ChatML':
+        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{input_text}<|im_end|>\n<|im_start|>assistant\nChloe Hayashi:"
 
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:
@@ -89,7 +99,7 @@ def chloe_ai(input_text, model=None):
         url = f"{os.getenv('Text-Generation')}/v1/completions"
         headers = {"Content-Type": "application/json"}
         data = {
-            "prompt": f"{instructions}\nYou: {input_text}\n\n### Response:\nChloe Hayashi:",
+            "prompt": prompt,
             "mode": "chat-instruct",
             "instruction_template": "Alpaca",
             "temperature": 0.6,

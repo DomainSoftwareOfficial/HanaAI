@@ -49,6 +49,8 @@ def hana_ai(input_text, model=None):
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
 
+    chat_set = os.getenv('Instruction-Set')
+
     # Use resource_path to access files with PyInstaller compatibility
     instructions_path = resource_path("../Data/Input/profile.hana")
     memory_path = resource_path("../Data/Input/memory.txt")
@@ -69,7 +71,10 @@ def hana_ai(input_text, model=None):
     with open(rag_path, "r", encoding='utf-8') as file:
         rag = file.read()
 
-    prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
+    if chat_set == 'Alpaca':
+        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
+    elif chat_set == 'ChatML':
+        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n\n{memory}\n{input_text}<|im_end|>\n<|im_start|>assistant\nHana Busujima:"
 
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:

@@ -126,6 +126,15 @@ class App(ctk.CTk):
         # Resolve the base path for PyInstaller
         self.base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 
+        superchat_path = self.resource_path('../Data/Chat/Special/superchat.chloe')
+        superviewer_path = self.resource_path('../Data/Chat/Special/superviewer.chloe')
+
+        with open(superchat_path, 'w', encoding='utf-8') as superchat_file:
+            superchat_file.write('')  # Empty the file content after use
+
+        with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
+                superviewer_file.write('')  # Empty the file content after use
+
         # Initialize LLM model to None
         self.llm_model = None
 
@@ -534,8 +543,8 @@ class App(ctk.CTk):
 
         predefined_inputs = [
             "Go on a tangent about humans or your life",
-            "Say something controversial (it's a joke though)",
-            "Make a joke about corperate (Either about Joykill, Joystick Studios, Domain Software, or some other company)",
+            "Say something controversial",
+            "Make fun of corperate (Either about Joykill, yourself, Chloe, Joystick Studios, Domain Software, or someone else)",
             "Say something that involves you swearing",
             "Go on a tangent about an unrelated topic" 
         ]
@@ -543,6 +552,7 @@ class App(ctk.CTk):
         self.cycle_active = False  # Tracks if we are in the predefined-input cycle
         self.predefined_input_flag = False  # Tracks if predefined input was chosen
         output_chloe_path = self.resource_path('../Data/Output/output.chloe')  # Monitor file output
+        superchat_path = self.resource_path('../Data/Chat/Special/superchat.chloe')  # Path for superchat
 
         last_formatted_string = None  # Initialize the variable
 
@@ -552,6 +562,17 @@ class App(ctk.CTk):
                 print("Random picker is paused due to active recording.")
                 time.sleep(1)  # Small sleep to prevent busy-waiting
                 continue
+
+            # Check if superchat.chloe has content
+            if os.path.exists(superchat_path):
+                with open(superchat_path, 'r', encoding='utf-8') as superchat_file:
+                    superchat_content = superchat_file.read().strip()
+                if superchat_content:
+                    print("Detected content in superchat.chloe, pausing random_picker for monitor_file.")
+                    self.pause_event.set()  # Pause random_picker
+                    self.new_file_ready_event.set()  # Notify monitor_file
+                    time.sleep(5)
+                    continue  # Skip the rest of the loop to allow monitor_file to take over
 
             if self.pause_event.is_set():
                 print("Random picker is paused for Chloe AI processing.")
@@ -685,6 +706,8 @@ class App(ctk.CTk):
     def monitor_file(self):
         chloe_file_path = self.resource_path('../Data/Output/output.hana')
         log_file_path = self.resource_path('../Data/Output/output.chloe')
+        superchat_path = self.resource_path('../Data/Chat/Special/superchat.chloe')
+        superviewer_path = self.resource_path('../Data/Chat/Special/superviewer.chloe')
 
         while not os.path.exists(chloe_file_path) and not self.stop_monitor_file.is_set():
             time.sleep(1)
@@ -701,11 +724,27 @@ class App(ctk.CTk):
             self.pause_event.set()
 
             try:
-                with open(chloe_file_path, 'r', encoding='utf-8') as file:
-                    chloe_text = file.read().strip()
+                # Check if superchat.chloe exists and has content
+                if os.path.exists(superchat_path):
+                    with open(superchat_path, 'r', encoding='utf-8') as superchat_file:
+                        chloe_text = superchat_file.read().strip()
+
+                    # If superchat is valid, try to get the viewer from superviewer.chloe
+                    if chloe_text:
+                        with open(superviewer_path, 'r', encoding='utf-8') as superviewer_file:
+                            viewer = superviewer_file.read().strip() or "Unknown Viewer"
+                    else:
+                        # If superchat.chloe is empty, fallback to default handling
+                        chloe_text = None
+
+                # Fallback logic: If superchat is not found or empty, use default chloe_file_path
+                if not chloe_text:
+                    with open(chloe_file_path, 'r', encoding='utf-8') as file:
+                        chloe_text = file.read().strip()
+                    viewer = "Hana Busujima"  # Default viewer for fallback case
 
                 if chloe_text:
-                    raw_chloe_text = f"System: Hana Busujima asks {chloe_text}"
+                    raw_chloe_text = f"System: {viewer} asks {chloe_text}"
 
                     if self.chloe_window and isinstance(self.chloe_window, CWindow):
                         self.chloe_window.update_textbox(raw_chloe_text)
@@ -723,6 +762,12 @@ class App(ctk.CTk):
                         distorted_output_path = self.resource_path('../Assets/Audio/chloe.wav')
                         static_file_path = self.resource_path('../Assets/Audio/radio.mp3')
                         distort(ai_output_path, static_file_path, output_file_path=distorted_output_path)
+
+                        with open(superchat_path, 'w', encoding='utf-8') as superchat_file:
+                            superchat_file.write('')  # Empty the file content after use
+
+                        with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
+                            superviewer_file.write('')  # Empty the file content after use
 
                         if self.chloe_window and isinstance(self.chloe_window, CWindow):
                             self.chloe_window.update_textbox("")  # Clear the text
@@ -745,8 +790,6 @@ class App(ctk.CTk):
             time.sleep(5)
 
         print("Exiting monitor_file thread.")
-
-
 
     def resource_path(self, relative_path):
         """ Get the absolute path to the resource, works for dev and for PyInstaller """
