@@ -7,6 +7,10 @@ import sys
 from dotenv import load_dotenv
 import requests
 import json
+import io
+import base64
+from PIL import Image, PngImagePlugin
+import uuid
 
 
 class CWindow(ctk.CTk):
@@ -103,7 +107,7 @@ def chloe_ai(input_text, model=None):
             "mode": "chat-instruct",
             "instruction_template": "Alpaca",
             "temperature": 0.6,
-            "max_tokens": 100,
+            "max_tokens": 512,
         }
 
         response = requests.post(url, headers=headers, json=data, verify=False)
@@ -122,6 +126,57 @@ def chloe_ai(input_text, model=None):
         print(f"Error connecting to WebUI: {e}")
         return "WebUI connection error."
 
+def generate_image(prompt):
+    # Generate a random filename
+    random_filename = f"../Assets/Images/{uuid.uuid4()}.png"
+    
+    load_dotenv()
+    url = os.getenv("Image-Generation")
+
+    negative_prompt_directory = resource_path("../Data/Input/negatives.txt")
+
+    with open(negative_prompt_directory, "r", encoding="utf-8") as file:
+        Negative_Prompt = file.read()
+
+    payload = {
+        "prompt": f"masterpiece, best quality, upper body shot, {prompt}, cinematic lighting, <lora:Cinematic:1>",
+        "negative_prompt": f"{Negative_Prompt}",
+        "sampler_name": "DPM++ 2M SDE",
+        "scheduler": "Karras",
+        "sd_model_checkpoint": os.getenv('Stable-Diffusion-Model'),
+        "batch_size": 1,
+        "width": 512,
+        "height": 512,
+        "seed": -1,
+        "steps": 60,
+        "cfg_scale": 7,
+    }
+
+    response = requests.post(url=f"{url}/sdapi/v1/txt2img", json=payload)
+
+    if response.status_code == 200:
+        try:
+            r = response.json()
+            if "images" in r:
+                for i in r["images"]:
+                    image = Image.open(io.BytesIO(base64.b64decode(r["images"][0])))
+
+                    png_payload = {"image": "data:image/png;base64," + i}
+                    response2 = requests.post(
+                        url=f"{url}/sdapi/v1/png-info", json=png_payload
+                    )
+                    pnginfo = PngImagePlugin.PngInfo()
+                    pnginfo.add_text("parameters", response2.json().get("info"))
+                    # Save the image with the random filename
+                    image.save(random_filename, pnginfo=pnginfo)
+                print(f"Image saved as {random_filename}")
+            else:
+                print("'images' key not found in the JSON response.")
+        except json.JSONDecodeError:
+            print("Error decoding JSON response.")
+    else:
+        print(f"Error: {response.status_code} - {response.text}")
+
 def resource_path(relative_path):
     """ Get the absolute path to the resource, works for dev and for PyInstaller """
     try:
@@ -131,3 +186,6 @@ def resource_path(relative_path):
         # Otherwise, use the current directory
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
+if __name__ == "__main__":
+    generate_image("Son Goku")

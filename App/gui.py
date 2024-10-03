@@ -8,11 +8,13 @@ import whisper
 import logging
 import emoji
 import shutil
+import queue
 from dotenv import load_dotenv
 from chloe import CWindow
 from hana import HWindow
 from hana import hana_ai
 from chloe import chloe_ai
+from chloe import generate_image
 from chat import YouTubeChatHandler
 from chat import TwitchChatHandler
 from audio import translate
@@ -120,6 +122,10 @@ class App(ctk.CTk):
         self.picker_thread = None
         self.monitor_thread = None
         self.handler_thread = None
+        self.draw_queue = queue.Queue()  # Queue to manage !draw commands
+        self.draw_thread = None  # Thread for processing draw commands
+        self.processing = False  # To track if the thread is processing
+
 
         self.known_emotes = []
 
@@ -553,6 +559,7 @@ class App(ctk.CTk):
         self.predefined_input_flag = False  # Tracks if predefined input was chosen
         output_chloe_path = self.resource_path('../Data/Output/output.chloe')  # Monitor file output
         superchat_path = self.resource_path('../Data/Chat/Special/superchat.chloe')  # Path for superchat
+        last_superchat_content = None  # Track last processed superchat content
 
         last_formatted_string = None  # Initialize the variable
 
@@ -567,12 +574,15 @@ class App(ctk.CTk):
             if os.path.exists(superchat_path):
                 with open(superchat_path, 'r', encoding='utf-8') as superchat_file:
                     superchat_content = superchat_file.read().strip()
-                if superchat_content:
-                    print("Detected content in superchat.chloe, pausing random_picker for monitor_file.")
+
+                if superchat_content and superchat_content != last_superchat_content:
+                    # New content detected in superchat.chloe
+                    last_superchat_content = superchat_content
+                    print("Detected new content in superchat.chloe, pausing random_picker for monitor_file.")
                     self.pause_event.set()  # Pause random_picker
                     self.new_file_ready_event.set()  # Notify monitor_file
                     time.sleep(5)
-                    continue  # Skip the rest of the loop to allow monitor_file to take over
+                    continue
 
             if self.pause_event.is_set():
                 print("Random picker is paused for Chloe AI processing.")
@@ -597,6 +607,11 @@ class App(ctk.CTk):
                     # Open the viewer files with UTF-8 encoding
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
+                                    # Check for !draw command in the input text
+
+                    if viewer_text.startswith('!draw'):
+                        self.handle_draw_command(viewer_text)
+                        continue
 
                     # Before processing the input_text, validate if it's a proper UTF-8 string
                     if not self.is_valid_utf8(input_text):
@@ -605,6 +620,11 @@ class App(ctk.CTk):
 
                     if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
                         print(f"Skipping invalid or empty input: {input_text}")
+
+                        # Now call handle_command if it starts with '!'
+                        if input_text.startswith('!'):
+                            self.handle_command(input_text)
+
                         time.sleep(5)
                         continue
 
@@ -636,6 +656,11 @@ class App(ctk.CTk):
 
                     if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
                         print(f"Skipping invalid or empty input: {input_text}")
+
+                        # Now call handle_command if it starts with '!'
+                        if input_text.startswith('!'):
+                            self.handle_command(input_text)
+
                         time.sleep(5)
                         continue
 
@@ -648,7 +673,7 @@ class App(ctk.CTk):
                 if target_language:
                     input_text = translate(input_text, target_language)
 
-            formatted_string = f"System: {viewer_text} asks: {input_text}"
+            formatted_string = f"System: {viewer_text} said: {input_text}"
 
             # Check if the current message is the same as the last one
             if formatted_string != last_formatted_string:
@@ -678,6 +703,8 @@ class App(ctk.CTk):
                     # Process the audio file with mainrvc and save as hana.wav
                     hana_output_path = self.resource_path('../Assets/Audio/hana.wav')
                     mainrvc(ai_output_path, hana_output_path)
+
+                    play(hana_output_path, self.selected_output_device_index)
 
                     # **Clear the HWindow text after hana.wav is created**
                     if self.hana_window and isinstance(self.hana_window, HWindow):
@@ -725,6 +752,8 @@ class App(ctk.CTk):
 
             try:
                 # Check if superchat.chloe exists and has content
+                superchat_used = False
+
                 if os.path.exists(superchat_path):
                     with open(superchat_path, 'r', encoding='utf-8') as superchat_file:
                         chloe_text = superchat_file.read().strip()
@@ -733,6 +762,7 @@ class App(ctk.CTk):
                     if chloe_text:
                         with open(superviewer_path, 'r', encoding='utf-8') as superviewer_file:
                             viewer = superviewer_file.read().strip() or "Unknown Viewer"
+                        superchat_used = True
                     else:
                         # If superchat.chloe is empty, fallback to default handling
                         chloe_text = None
@@ -744,12 +774,15 @@ class App(ctk.CTk):
                     viewer = "Hana Busujima"  # Default viewer for fallback case
 
                 if chloe_text:
-                    raw_chloe_text = f"System: {viewer} asks {chloe_text}"
+                    raw_chloe_text = f"System: {viewer} said: {chloe_text}"
 
                     if self.chloe_window and isinstance(self.chloe_window, CWindow):
                         self.chloe_window.update_textbox(raw_chloe_text)
-
-                    processed_chloe_text = chloe_ai(raw_chloe_text, self.llm_model)
+                    # Superchat-specific prompt or regular AI prompt
+                    if superchat_used:
+                        processed_chloe_text = f"Thank you {viewer} for the superchat {chloe_ai(raw_chloe_text, self.llm_model)}"
+                    else:
+                        processed_chloe_text = chloe_ai(raw_chloe_text, self.llm_model)
 
                     with open(log_file_path, 'w', encoding='utf-8') as file:
                         file.write(f"{processed_chloe_text}\n")
@@ -768,6 +801,8 @@ class App(ctk.CTk):
 
                         with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
                             superviewer_file.write('')  # Empty the file content after use
+
+                        play(distorted_output_path, self.selected_output_device_index)
 
                         if self.chloe_window and isinstance(self.chloe_window, CWindow):
                             self.chloe_window.update_textbox("")  # Clear the text
@@ -790,6 +825,61 @@ class App(ctk.CTk):
             time.sleep(5)
 
         print("Exiting monitor_file thread.")
+
+    def handle_command(self, command):
+        """
+        General handler for commands starting with '!'.
+        """
+        print(f"Handling command: {command}")
+
+        # Handle the !draw command
+        if command.startswith('!draw'):
+            self.handle_draw_command(command)
+        else:
+            print(f"Unknown command received: {command}")
+
+    def handle_draw_command(self, command):
+        # Strip !draw from the command
+        command_text = command.lstrip('!draw').strip()
+        print(f"Detected !draw command: {command_text}")
+
+        # Add the command to the draw queue
+        self.draw_queue.put(command_text)
+
+        # Start the processing thread if not already running
+        if not self.processing:
+            self.processing = True
+            self.draw_thread = threading.Thread(target=self.process_draw_commands)
+            self.draw_thread.start()
+
+    def process_draw_commands(self):
+        """Thread function to process draw commands sequentially."""
+        while True:
+            try:
+                # Get the next item from the queue, block if empty
+                input_text = self.draw_queue.get(block=True)
+
+                if input_text is None:
+                    # Special case to exit the thread
+                    break
+
+                # Strip !draw from the input text
+                input_text = input_text.replace("!draw", "").strip()
+
+                # Call the imported function with the stripped input
+                generate_image(input_text)  # Assuming imported_function is defined elsewhere
+
+                self.draw_queue.task_done()  # Mark the task as done
+                print(f"Finished processing draw command: {input_text}")
+
+            except Exception as e:
+                print(f"Error while processing draw command: {e}")
+            
+            # If the queue is empty, finish processing
+            if self.draw_queue.empty():
+                print("No more draw commands. Exiting draw thread.")
+                self.processing = False
+                break
 
     def resource_path(self, relative_path):
         """ Get the absolute path to the resource, works for dev and for PyInstaller """

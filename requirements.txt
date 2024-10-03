@@ -39,4 +39,5 @@ tensorboard
 tensorboard-data-server
 tensorboard-plugin-wit
 pyinstaller
+Pillow
 git+https://github.com/One-sixth/fairseq.git

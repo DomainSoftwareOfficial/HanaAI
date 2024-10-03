@@ -15,6 +15,7 @@ from transformers import MarianMTModel, MarianTokenizer
 from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 import sounddevice as sd
+import soundfile as sf
 # Mapping for supported languages and models
 
 load_dotenv()
@@ -315,34 +316,39 @@ def translate(text, target_lang):
         # Step 1: Detect the source language
         src_lang = detect(text)
 
-        # Step 2: Check if the detected language is supported in the LANGUAGE_MODEL_MAP
+        # Step 2: If the detected language is the same as the target language, return the original text
+        if src_lang == target_lang:
+            print(f"Source language '{src_lang}' is the same as the target language. No translation needed.")
+            return text
+
+        # Step 3: Check if the detected language is supported in the LANGUAGE_MODEL_MAP
         if src_lang not in LANGUAGE_MODEL_MAP or target_lang not in LANGUAGE_MODEL_MAP.get(src_lang, {}):
             print(f"Language pair '{src_lang}' to '{target_lang}' not supported. Assuming input is in English.")
             src_lang = 'en'  # Default to English as the source language
 
-        # Step 3: Check if there's a model for translation from English to the target language
+        # Step 4: Check if there's a model for translation from English to the target language
         if target_lang not in LANGUAGE_MODEL_MAP.get(src_lang, {}):
             print(f"Cannot find a translation model for '{src_lang}' to '{target_lang}'. Returning the original text.")
             return text
 
-        # Step 4: Load the model and tokenizer for the detected language pair (or English to target language)
+        # Step 5: Load the model and tokenizer for the detected language pair (or English to target language)
         model_name = LANGUAGE_MODEL_MAP[src_lang][target_lang]
         tokenizer = MarianTokenizer.from_pretrained(model_name)
         model = MarianMTModel.from_pretrained(model_name)
 
-        # Step 5: Tokenize the input text
+        # Step 6: Tokenize the input text
         inputs = tokenizer(text, return_tensors="pt", padding=True)
 
-        # Step 6: Perform the translation
+        # Step 7: Perform the translation
         translated = model.generate(**inputs)
 
-        # Step 7: Decode the translated text
+        # Step 8: Decode the translated text
         translated_text = tokenizer.batch_decode(translated, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
         return translated_text[0]
 
-    except LangDetectException:
-        print("Language could not be detected. Returning the original text.")
+    except Exception as e:
+        print(f"Error: {e}")
         return text
 
 
@@ -357,36 +363,20 @@ def check_wav_properties(file_path):
 
 
 def play(file_path, output_device_index=None):
-    try:
-        # Load the WAV file
-        audio = AudioSegment.from_file(file_path)
-
-        # Resample the audio to 48000 Hz, 16-bit, stereo
-        resampled_audio = audio.set_frame_rate(48000).set_sample_width(2).set_channels(2)
-
-        # Convert audio to numpy array for playback with sounddevice
-        audio_data = np.array(resampled_audio.get_array_of_samples())
-        audio_data = audio_data.astype(np.float32) / (2 ** 15)  # Normalize the audio data
-
-        # If no output device index provided, use default output device
-        if output_device_index is None:
-            output_device_index = sd.default.device['output']
-
-        # Get information about the selected output device
-        device_info = sd.query_devices(output_device_index, 'output')
-        expected_channels = device_info['max_output_channels']
-
-        # Ensure the audio has the correct number of channels
-        if resampled_audio.channels != expected_channels:
-            print(f"Resampling to match the output device channels: {expected_channels} channels.")
-            resampled_audio = resampled_audio.set_channels(expected_channels)
-
-        # Play the resampled audio using the selected output device
-        sd.play(audio_data, samplerate=resampled_audio.frame_rate, device=output_device_index)
-        sd.wait()  # Wait until audio is finished playing
-
-    except Exception as e:
-        print(f"An error occurred while trying to play the audio: {e}")
+    # Load audio file
+    data, samplerate = sf.read(file_path)
+    
+    # Set output device if specified
+    if output_device_index is not None:
+        sd.default.device = output_device_index
+    
+    # Play the audio
+    sd.play(data, samplerate)
+    
+    # Wait until the file has finished playing
+    sd.wait()
+    
+    print(f"Audio playback finished for {file_path}")
 
 
         

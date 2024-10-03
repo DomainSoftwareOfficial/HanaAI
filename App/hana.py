@@ -102,7 +102,7 @@ def hana_ai(input_text, model=None):
             "prompt": prompt,
             "mode": "chat-instruct",
             "instruction_template": "Alpaca",
-            "max_tokens": 100,
+            "max_tokens": 512,
         }
 
         response = requests.post(url, headers=headers, json=data, verify=False)
