@@ -10,24 +10,24 @@ import emoji
 import shutil
 import queue
 from dotenv import load_dotenv
-from chloe import CWindow
-from hana import HWindow
-from hana import hana_ai
-from chloe import chloe_ai
-from chloe import generate_image
-from chat import YouTubeChatHandler
-from chat import TwitchChatHandler
-from audio import translate
-from audio import record_audio
-from audio import distort
-from audio import tts_en
-from audio import tts_es
-from audio import tts_ja
-from audio import tts_ru
-from rvc import mainrvc
-from audio import play
-from rag import mainrag
-from model import load_model
+from App.chloe import CWindow
+from App.hana import HWindow
+from App.hana import hana_ai
+from App.chloe import chloe_ai
+from App.chloe import generate_image
+from App.chat import YouTubeChatHandler
+from App.chat import TwitchChatHandler
+from App.audio import translate
+from App.audio import record_audio
+from App.audio import distort
+from App.audio import tts_en
+from App.audio import tts_es
+from App.audio import tts_ja
+from App.audio import tts_ru
+from App.rvc import mainrvc
+from App.audio import play
+from App.rag import mainrag
+from App.model import load_model
 
 logging.getLogger("httpcore").setLevel(logging.CRITICAL)
 logging.getLogger("httpx").setLevel(logging.CRITICAL)
