@@ -91,6 +91,8 @@ def chloe_ai(input_text, model=None):
             new_result = re.sub(r'\*.*?\*', '', new_result)  # Remove text between asterisks
             new_result = emoji.replace_emoji(new_result, replace='')  # Remove emojis
 
+            new_result = truncate_at_newline(new_result)
+
             print(f"Chloe said (via GGUF): {new_result}")
             return new_result
         except Exception as e:
@@ -119,6 +121,8 @@ def chloe_ai(input_text, model=None):
             new_result = results.replace("\n", "")
             new_result = re.sub(r'\*.*?\*', '', new_result)
             new_result = emoji.replace_emoji(new_result, replace='')
+
+            new_result = truncate_at_newline(new_result)
 
             print(f"Chloe said (via WebUI): {new_result}")
             return new_result
@@ -179,6 +183,23 @@ def generate_image(prompt):
             print("Error decoding JSON response.")
     else:
         print(f"Error: {response.status_code} - {response.text}")
+
+def truncate_at_newline(text):
+    """Truncate the text right before it encounters any newline sequences (<0x0A><0x0A> or <0x0A> in the output)."""
+    # First, look for double newlines \n\n (corresponding to <0x0A><0x0A>)
+    double_newline_pos = text.find('<0x0A><0x0A>')
+    if double_newline_pos != -1:
+        # Truncate everything after the first occurrence of <0x0A><0x0A>
+        return text[:double_newline_pos].strip()
+    
+    # If no double newline is found, look for a single newline \n (corresponding to <0x0A>)
+    single_newline_pos = text.find('<0x0A>')
+    if single_newline_pos != -1:
+        # Truncate everything after the first occurrence of <0x0A>
+        return text[:single_newline_pos].strip()
+
+    # If no newlines are found, return the original text
+    return text.strip()
 
 def resource_path(relative_path):
     """ Get the absolute path to the resource, works for dev and for PyInstaller """

@@ -136,12 +136,20 @@ def hana_ai(input_text, model=None):
 
 # Helper function to truncate at newlines
 def truncate_at_newline(text):
-    """Truncate the text right before it encounters any newline characters."""
-    # Find the first occurrence of newline \n or double newline \n\n
-    newline_pos = text.find('\n')
-    if newline_pos != -1:
-        # Truncate the text before the first newline
-        return text[:newline_pos].strip()
+    """Truncate the text right before it encounters any newline sequences (<0x0A><0x0A> or <0x0A> in the output)."""
+    # First, look for double newlines \n\n (corresponding to <0x0A><0x0A>)
+    double_newline_pos = text.find('<0x0A><0x0A>')
+    if double_newline_pos != -1:
+        # Truncate everything after the first occurrence of <0x0A><0x0A>
+        return text[:double_newline_pos].strip()
+    
+    # If no double newline is found, look for a single newline \n (corresponding to <0x0A>)
+    single_newline_pos = text.find('<0x0A>')
+    if single_newline_pos != -1:
+        # Truncate everything after the first occurrence of <0x0A>
+        return text[:single_newline_pos].strip()
+
+    # If no newlines are found, return the original text
     return text.strip()
 
 def append_to_history_file(history_file_path, input_text, new_result):
