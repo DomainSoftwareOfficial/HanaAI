@@ -80,14 +80,19 @@ def hana_ai(input_text, model=None):
     if model is not None:
         print("Local GGUF model is provided. Using the local model.")
         try:
-            response = model(prompt, max_tokens=100, temperature=0.6, top_p=0.9)  # Adjust as needed
+            response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.8, top_k=50)  # Adjust as needed
 
             # Process the response
             new_result = response['choices'][0]['text'].replace("\n", "")
             new_result = re.sub(r'\*.*?\*', '', new_result)  # Remove text between asterisks
             new_result = emoji.replace_emoji(new_result, replace='')  # Remove emojis
 
+            new_result = truncate_at_newline(new_result)
+
             print(f"Hana said (via GGUF): {new_result}")
+
+            append_to_history_file(memory_path, input_text, new_result)
+
             return new_result
         except Exception as e:
             print(f"Error using GGUF model: {e}")
@@ -103,6 +108,9 @@ def hana_ai(input_text, model=None):
             "mode": "chat-instruct",
             "instruction_template": "Alpaca",
             "max_tokens": 512,
+            "temperature": 0.6,
+            "top_p": 0.8,
+            "top_k": 50,
         }
 
         response = requests.post(url, headers=headers, json=data, verify=False)
@@ -112,7 +120,12 @@ def hana_ai(input_text, model=None):
             new_result = re.sub(r'\*.*?\*', '', new_result)
             new_result = emoji.replace_emoji(new_result, replace='')
 
+            new_result = truncate_at_newline(new_result)
+
             print(f"Hana said (via WebUI): {new_result}")
+
+            append_to_history_file(memory_path, input_text, new_result)
+
             return new_result
         else:
             print(f"WebUI request failed with status code: {response.status_code}")
@@ -120,7 +133,43 @@ def hana_ai(input_text, model=None):
     except Exception as e:
         print(f"Error connecting to WebUI: {e}")
         return "WebUI connection error."
-    
+
+# Helper function to truncate at newlines
+def truncate_at_newline(text):
+    """Truncate the text right before it encounters any newline characters."""
+    # Find the first occurrence of newline \n or double newline \n\n
+    newline_pos = text.find('\n')
+    if newline_pos != -1:
+        # Truncate the text before the first newline
+        return text[:newline_pos].strip()
+    return text.strip()
+
+def append_to_history_file(history_file_path, input_text, new_result):
+    """Append the input and output to the history file, keeping only the last 12 lines (6 input-output pairs)."""
+    # Clean up the new_result to ensure no leading/trailing spaces or newlines
+    new_result = new_result.strip()
+
+    # Create the new entry (input and output, separated by a newline)
+    new_entry = f"{input_text}\nHana Busujima: {new_result}\n"
+
+    # Read the current content of the history file
+    if os.path.exists(history_file_path):
+        with open(history_file_path, "r", encoding="utf-8") as file:
+            lines = file.readlines()
+    else:
+        lines = []
+
+    # Append the new entry
+    lines.append(new_entry)
+
+    # Limit the file to 12 lines (6 input-output pairs)
+    if len(lines) > 11:
+        lines = lines[-11:]  # Keep only the last 12 lines, removing the oldest entries
+
+    # Write the updated content back to the file
+    with open(history_file_path, "w", encoding="utf-8") as file:
+        file.writelines(lines)
+
 def resource_path(relative_path):
     """ Get the absolute path to the resource, works for dev and for PyInstaller """
     try:
@@ -130,3 +179,6 @@ def resource_path(relative_path):
         # Otherwise, use the current directory
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
+if __name__ == "__main__":
+    hana_ai("User: JoyKill asks: Hey, how are you!")

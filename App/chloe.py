@@ -84,7 +84,7 @@ def chloe_ai(input_text, model=None):
         print("Local GGUF model is provided. Using the local model.")
         try:
             # Generate response using the local model
-            response = model(prompt, max_tokens=100, temperature=0.6, top_p=0.9)  # Adjust as needed
+            response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.8, top_k=50)  # Adjust as needed
 
             # Process the response
             new_result = response['choices'][0]['text'].replace("\n", "")
@@ -108,6 +108,9 @@ def chloe_ai(input_text, model=None):
             "instruction_template": "Alpaca",
             "temperature": 0.6,
             "max_tokens": 512,
+            "temperature": 0.6,
+            "top_p": 0.8,
+            "top_k": 50,
         }
 
         response = requests.post(url, headers=headers, json=data, verify=False)

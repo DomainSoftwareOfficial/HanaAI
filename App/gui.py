@@ -548,11 +548,11 @@ class App(ctk.CTk):
         ]
 
         predefined_inputs = [
-            "Go on a tangent about humans or your life",
+            "Talk about humans or your life",
             "Say something controversial",
             "Make fun of corperate (Either about Joykill, yourself, Chloe, Joystick Studios, Domain Software, or someone else)",
             "Say something that involves you swearing",
-            "Go on a tangent about an unrelated topic" 
+            "Talk about any topic" 
         ]
 
         self.cycle_active = False  # Tracks if we are in the predefined-input cycle
