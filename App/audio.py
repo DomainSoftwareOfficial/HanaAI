@@ -216,7 +216,7 @@ def loop_static(static, speech_length):
     loops = int(speech_length / len(static)) + 1  # Calculate how many times we need to loop
     return static * loops
 
-def distort(speech_file_path, static_file_path, semitones=5, volume_reduction=0.2, final_output_reduction=0.8, output_file_path="output.wav"):
+def distort(speech_file_path, static_file_path, semitones=2, volume_reduction=0.2, final_output_reduction=0.95, output_file_path="output.wav"):
     # Load the speech audio and static audio
     speech = AudioSegment.from_file(speech_file_path)
     static = AudioSegment.from_file(static_file_path)

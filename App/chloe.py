@@ -9,7 +9,7 @@ import requests
 import json
 import io
 import base64
-from PIL import Image, PngImagePlugin
+from PIL import Image, PngImagePlugin, ImageTk
 import uuid
 
 
@@ -49,6 +49,88 @@ class CWindow(ctk.CTk):
         if new_text != current_text:
             self.textbox.delete("1.0", tk.END)
             self.textbox.insert(tk.END, new_text)
+
+class InvisibleWindow(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.withdraw()  # Make the window invisible
+
+        # Store the latest generated image path
+        self.latest_image = None
+
+        # Set up the window to handle showing the image
+        self.setup_image_window()
+
+        # Bind the 'h+j' key press combination
+        self.bind_all("<KeyPress-h>", self.on_h_press)
+        self.bind_all("<KeyPress-j>", self.on_j_press)
+        self.bind_all("<KeyRelease-h>", self.on_h_release)
+        self.bind_all("<KeyRelease-j>", self.on_j_release)
+
+        # Track key presses for the combination
+        self.h_pressed = False
+        self.j_pressed = False
+
+    def setup_image_window(self):
+        # Set up a window (but invisible by default) to show the image when 'h+j' is pressed
+        self.image_window = tk.Toplevel(self)
+        self.image_window.withdraw()  # Keep this window hidden initially
+        self.image_window.title("Generated Image")
+        self.image_window.geometry("512x512")  # Set appropriate size for image display
+
+        # Make the window borderless and always on top
+        self.image_window.overrideredirect(True)  # Remove window borders
+        self.image_window.attributes("-topmost", True)  # Keep the window on top of others
+
+        # Calculate screen dimensions
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        # Calculate the position to place the window 3/4 horizontally (right side) and centered vertically
+        x_position = int(screen_width * 7 / 8) + 256 # 3/4 to the right minus half the window width
+        y_position = int(screen_height / 2) # Center vertically minus half the window height
+
+        # Set the geometry of the image window with the calculated position
+        self.image_window.geometry(f"512x512+{x_position}+{y_position}")
+
+        # Create a label in the image window to show the image
+        self.image_label = tk.Label(self.image_window)
+        self.image_label.pack()
+        
+    def on_h_press(self, event):
+        self.h_pressed = True
+        if self.h_pressed and self.j_pressed:
+            self.display_latest_image()
+
+    def on_j_press(self, event):
+        self.j_pressed = True
+        if self.h_pressed and self.j_pressed:
+            self.display_latest_image()
+
+    def on_h_release(self, event):
+        self.h_pressed = False
+
+    def on_j_release(self, event):
+        self.j_pressed = False
+
+    def display_latest_image(self):
+        if self.latest_image and os.path.exists(self.latest_image):
+            img = Image.open(self.latest_image)
+            img = img.resize((512, 512))  # Resize image to fit window
+            img_tk = ImageTk.PhotoImage(img)
+
+            # Update the label with the image
+            self.image_label.config(image=img_tk)
+            self.image_label.image = img_tk
+
+            # Show the image window
+            self.image_window.deiconify()
+        else:
+            print("No image available or file not found.")
+
+    def update_latest_image(self, image_path):
+        self.latest_image = image_path
 
 def chloe_ai(input_text, model=None):
     """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
@@ -146,14 +228,16 @@ def generate_image(prompt):
         Negative_Prompt = file.read()
 
     payload = {
-        "prompt": f"masterpiece, best quality, upper body shot, {prompt}, cinematic lighting, <lora:Cinematic:1>",
+        "prompt": f"masterpiece, best quality, subject in focus, {prompt}, cinematic lighting, <lora:Cinematic:1>",
         "negative_prompt": f"{Negative_Prompt}",
-        "sampler_name": "DPM++ 2M SDE",
+        "sampler_name": "DPM++ 3M SDE",
         "scheduler": "Karras",
-        "sd_model_checkpoint": os.getenv('Stable-Diffusion-Model'),
+        "sd_model_checkpoint": os.getenv('Stable-Diffusion-Model-Base'),
+        "refiner_checkpoint": os.getenv('Stable-Diffusion-Model-Refiner'),
+        "refiner_switch_at": 0.2,
         "batch_size": 1,
-        "width": 512,
-        "height": 512,
+        "width": 1024,
+        "height": 1024,
         "seed": -1,
         "steps": 60,
         "cfg_scale": 7,
@@ -177,12 +261,16 @@ def generate_image(prompt):
                     # Save the image with the random filename
                     image.save(random_filename, pnginfo=pnginfo)
                 print(f"Image saved as {random_filename}")
+                return random_filename  # Return the saved image path
             else:
                 print("'images' key not found in the JSON response.")
+                return None
         except json.JSONDecodeError:
             print("Error decoding JSON response.")
+            return None
     else:
         print(f"Error: {response.status_code} - {response.text}")
+        return None
 
 def truncate_at_newline(text):
     """Truncate the text right before it encounters any newline sequences (<0x0A><0x0A> or <0x0A> in the output)."""
@@ -212,4 +300,21 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 if __name__ == "__main__":
-    generate_image("Son Goku")
+    # Generate the image and get the file path
+    image_path = generate_image("Kasane Teto singing on stage")
+
+    if image_path:
+        # Initialize the invisible window
+        print("Testing: Image generated and window will be shown.")
+        app = InvisibleWindow()
+
+        # Update the invisible window with the latest image path
+        app.update_latest_image(image_path)
+
+        # Directly call the function to display the image without keypress
+        app.display_latest_image()
+
+        # Start the app loop
+        app.mainloop()
+    else:
+        print("Failed to generate an image.")

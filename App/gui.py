@@ -557,9 +557,12 @@ class App(ctk.CTk):
         predefined_inputs = [
             "Talk about humans or your life",
             "Say something controversial",
-            "Make fun of corperate (Either about Joykill, yourself, Chloe, Joystick Studios, Domain Software, or someone else)",
-            "Say something that involves you swearing",
-            "Talk about any topic" 
+            "Make a hot take. (topic is your choice).",
+            "Say something that involves you swearing.",
+            "Change subject to anime.",
+            "Change subject to the economy.",
+            "Change subject to politics.",
+            "Change subject to guns.",
         ]
 
         self.cycle_active = False  # Tracks if we are in the predefined-input cycle
