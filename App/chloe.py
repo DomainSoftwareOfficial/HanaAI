@@ -11,6 +11,7 @@ import io
 import base64
 from PIL import Image, PngImagePlugin, ImageTk
 import uuid
+import threading
 
 
 class CWindow(ctk.CTk):
@@ -50,88 +51,132 @@ class CWindow(ctk.CTk):
             self.textbox.delete("1.0", tk.END)
             self.textbox.insert(tk.END, new_text)
 
-class InvisibleWindow(ctk.CTk):
+
+class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.withdraw()  # Make the window invisible
+        self.title("Main App with Status and Button")
+        self.geometry("300x200")
+        ctk.set_appearance_mode("dark")  # Dark mode
+        ctk.set_default_color_theme("green")  # Green accent
 
-        # Store the latest generated image path
+        # Create a status bar (red initially)
+        self.status_bar = ctk.CTkLabel(self, text="Waiting for input", fg_color="red", height=30)
+        self.status_bar.pack(side="top", fill="x", pady=(0, 10))
+
+        # Create a rectangular button (initially disabled)
+        self.button = ctk.CTkButton(self, text="Show Image", state="disabled", command=self.show_image)
+        self.button.pack(pady=20)
+
+        # Create an invisible window for showing the image
+        self.invisible_window = InvisibleWindow() # Ensure this is correctly creating the window object
+
+        # Image path (initially None)
         self.latest_image = None
 
-        # Set up the window to handle showing the image
+        # Start image generation in a separate thread
+        self.generate_image_async()
+
+    def generate_image_async(self):
+        # Run the image generation in a separate thread
+        threading.Thread(target=self.generate_image_thread).start()
+
+    def generate_image_thread(self):
+        # Generate the image
+        image_path = generate_image("Studious Lad going to school")
+        
+        self.after(0, self.update_image, image_path)
+        print(image_path)
+
+    def update_image(self, image_path):
+        self.latest_image = image_path
+
+        if self.latest_image:
+            # Update the status bar to green and enable the button
+            self.status_bar.configure(text="Image Ready", fg_color="green")
+            self.button.configure(state="normal")  # Enable the button
+
+            # Update the invisible window with the latest image
+            self.invisible_window.update_latest_image(self.latest_image)
+        else:
+            print("Failed to generate an image.")
+            self.status_bar.configure(text="Image generation failed", fg_color="red")
+
+    def show_image(self):
+        # Disable the button while the image is shown
+        self.button.configure(state="disabled")
+
+        # Trigger the invisible window to show the image
+        self.invisible_window.display_latest_image()
+
+        # Reset the status bar and button after image is shown
+        self.after(30000, self.reset_after_image_display)  # Wait for 30 seconds
+
+    def reset_after_image_display(self):
+        self.status_bar.configure(text="Waiting for input", fg_color="red")
+        self.button.configure(state="normal")  # Enable the button for new inputs
+
+class InvisibleWindow(ctk.CTk):
+    def __init__(self):
+        super().__init__()  # Initialize the CTk window
+
+        # Correctly create the Toplevel window (this might be where the issue is)
+        self.withdraw()  # Make the main window invisible
+        self.latest_image = None
+
+        # Set up the image window
         self.setup_image_window()
 
-        # Bind the 'h+j' key press combination
-        self.bind_all("<KeyPress-h>", self.on_h_press)
-        self.bind_all("<KeyPress-j>", self.on_j_press)
-        self.bind_all("<KeyRelease-h>", self.on_h_release)
-        self.bind_all("<KeyRelease-j>", self.on_j_release)
-
-        # Track key presses for the combination
-        self.h_pressed = False
-        self.j_pressed = False
-
     def setup_image_window(self):
-        # Set up a window (but invisible by default) to show the image when 'h+j' is pressed
-        self.image_window = tk.Toplevel(self)
-        self.image_window.withdraw()  # Keep this window hidden initially
+        # Create a new Toplevel window
+        self.image_window = tk.Toplevel(self)  # Link it to the current invisible window
+        self.image_window.withdraw()  # Keep it hidden initially
         self.image_window.title("Generated Image")
-        self.image_window.geometry("512x512")  # Set appropriate size for image display
+        self.image_window.geometry("512x512")
 
         # Make the window borderless and always on top
-        self.image_window.overrideredirect(True)  # Remove window borders
-        self.image_window.attributes("-topmost", True)  # Keep the window on top of others
+        self.image_window.overrideredirect(True)
+        self.image_window.attributes("-topmost", True)
 
-        # Calculate screen dimensions
+        # Position the window (ensure this calculation is correct)
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-
-        # Calculate the position to place the window 3/4 horizontally (right side) and centered vertically
-        x_position = int(screen_width * 7 / 8) + 256 # 3/4 to the right minus half the window width
-        y_position = int(screen_height / 2) # Center vertically minus half the window height
-
-        # Set the geometry of the image window with the calculated position
+        x_position = int(screen_width * 7 / 8) + 256
+        y_position = int(screen_height / 2)
         self.image_window.geometry(f"512x512+{x_position}+{y_position}")
 
         # Create a label in the image window to show the image
         self.image_label = tk.Label(self.image_window)
         self.image_label.pack()
-        
-    def on_h_press(self, event):
-        self.h_pressed = True
-        if self.h_pressed and self.j_pressed:
-            self.display_latest_image()
-
-    def on_j_press(self, event):
-        self.j_pressed = True
-        if self.h_pressed and self.j_pressed:
-            self.display_latest_image()
-
-    def on_h_release(self, event):
-        self.h_pressed = False
-
-    def on_j_release(self, event):
-        self.j_pressed = False
-
-    def display_latest_image(self):
-        if self.latest_image and os.path.exists(self.latest_image):
-            img = Image.open(self.latest_image)
-            img = img.resize((512, 512))  # Resize image to fit window
-            img_tk = ImageTk.PhotoImage(img)
-
-            # Update the label with the image
-            self.image_label.config(image=img_tk)
-            self.image_label.image = img_tk
-
-            # Show the image window
-            self.image_window.deiconify()
-        else:
-            print("No image available or file not found.")
 
     def update_latest_image(self, image_path):
         self.latest_image = image_path
 
+    def display_latest_image(self):
+        if self.latest_image and os.path.exists(self.latest_image):
+            try:
+                # Load the image
+                img = Image.open(self.latest_image)
+                img = img.resize((512, 512))
+
+                # Create a persistent reference to the image
+                self.image_obj = ImageTk.PhotoImage(img)
+
+                # Update the label with the image
+                self.image_label.config(image=self.image_obj)
+
+                # Show the image window
+                self.image_window.deiconify()
+
+                # Hide the window after 30 seconds
+                self.after(30000, self.image_window.withdraw)
+
+            except Exception as e:
+                print(f"Error loading image: {e}")
+        else:
+            print("No image available or file not found.")
+            
 def chloe_ai(input_text, model=None):
     """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
 
@@ -228,16 +273,16 @@ def generate_image(prompt):
         Negative_Prompt = file.read()
 
     payload = {
-        "prompt": f"masterpiece, best quality, subject in focus, {prompt}, cinematic lighting, <lora:Cinematic:1>",
+        "prompt": f"masterpiece, best quality, very detailed eyes, subject in focus, defined eyes, {prompt}, cinematic lighting",
         "negative_prompt": f"{Negative_Prompt}",
         "sampler_name": "DPM++ 3M SDE",
         "scheduler": "Karras",
-        "sd_model_checkpoint": os.getenv('Stable-Diffusion-Model-Base'),
-        "refiner_checkpoint": os.getenv('Stable-Diffusion-Model-Refiner'),
-        "refiner_switch_at": 0.2,
+        "checkpoint": os.getenv('Stable-Diffusion-Model-Base'),
+        # "refiner_checkpoint": os.getenv('Stable-Diffusion-Model-Refiner'),
+        # "refiner_switch_at": 0.5,
         "batch_size": 1,
-        "width": 1024,
-        "height": 1024,
+        "width": 512,
+        "height": 512,
         "seed": -1,
         "steps": 60,
         "cfg_scale": 7,
@@ -300,21 +345,8 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 if __name__ == "__main__":
-    # Generate the image and get the file path
-    image_path = generate_image("Kasane Teto singing on stage")
+    # Initialize and start the main app
+    app = MainApp()
 
-    if image_path:
-        # Initialize the invisible window
-        print("Testing: Image generated and window will be shown.")
-        app = InvisibleWindow()
-
-        # Update the invisible window with the latest image path
-        app.update_latest_image(image_path)
-
-        # Directly call the function to display the image without keypress
-        app.display_latest_image()
-
-        # Start the app loop
-        app.mainloop()
-    else:
-        print("Failed to generate an image.")
+    # Start the app loop
+    app.mainloop()

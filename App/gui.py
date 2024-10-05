@@ -126,7 +126,8 @@ class App(ctk.CTk):
         self.draw_queue = queue.Queue()  # Queue to manage !draw commands
         self.draw_thread = None  # Thread for processing draw commands
         self.processing = False  # To track if the thread is processing
-
+        self.chloe_window_active = False
+        self.hana_window_active = False
 
         self.known_emotes = []
 
@@ -284,6 +285,8 @@ class App(ctk.CTk):
         self.stop_monitor_file = threading.Event()
         self.pause_event = threading.Event()
         self.new_file_ready_event = threading.Event()
+
+        self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
     def on_search_change(self, event):
         # Cancel any existing scheduled print function
@@ -617,11 +620,6 @@ class App(ctk.CTk):
                     # Open the viewer files with UTF-8 encoding
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
-                                    # Check for !draw command in the input text
-
-                    if viewer_text.startswith('!draw'):
-                        self.handle_draw_command(viewer_text)
-                        continue
 
                     # Before processing the input_text, validate if it's a proper UTF-8 string
                     if not self.is_valid_utf8(input_text):
@@ -842,9 +840,13 @@ class App(ctk.CTk):
         """
         print(f"Handling command: {command}")
 
-        # Handle the !draw command
+        # Handle the !draw command only if Art-On is set to True
         if command.startswith('!draw'):
-            self.handle_draw_command(command)
+            # Check if Art-On environment variable is set to "True"
+            if os.getenv('Art-On', 'False').lower() == 'true':
+                self.handle_draw_command(command)
+            else:
+                print("Art-On is disabled, ignoring !draw command.")
         else:
             print(f"Unknown command received: {command}")
 
