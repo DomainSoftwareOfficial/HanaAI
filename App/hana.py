@@ -7,6 +7,8 @@ import sys
 from dotenv import load_dotenv
 import requests
 import json
+from datetime import datetime
+import time
 
 class HWindow(ctk.CTk):
     def __init__(self, app):
@@ -46,8 +48,15 @@ class HWindow(ctk.CTk):
 def hana_ai(input_text, model=None):
     """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
 
+    def log_debug(message):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"{timestamp} | INFO | {message}")
+
+    log_debug("Starting Hana AI processing...")
+
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
+    log_debug("Loaded environment variables.")
 
     chat_set = os.getenv('Instruction-Set')
 
@@ -55,6 +64,8 @@ def hana_ai(input_text, model=None):
     instructions_path = resource_path("../Data/Input/profile.hana")
     memory_path = resource_path("../Data/Input/memory.txt")
     rag_path = resource_path("../Data/Input/results.txt")
+
+    log_debug(f"Reading input files: {instructions_path}, {memory_path}, {rag_path}")
 
     # Ensure files are read with UTF-8 encoding
     with open(instructions_path, "r", encoding='utf-8') as file:
@@ -71,16 +82,23 @@ def hana_ai(input_text, model=None):
     with open(rag_path, "r", encoding='utf-8') as file:
         rag = file.read()
 
+    log_debug("Input files successfully read.")
+
     if chat_set == 'Alpaca':
         prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n\n{memory}\n{input_text}\n\n### Response:\nHana Busujima:"
     elif chat_set == 'ChatML':
         prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n\n{memory}\n{input_text}<|im_end|>\n<|im_start|>assistant\nHana Busujima:"
 
+    log_debug(f"Generated prompt using {chat_set} instruction set.")
+
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:
-        print("Local GGUF model is provided. Using the local model.")
+        log_debug("Local GGUF model is provided. Using the local model.")
         try:
+            start_time = time.time()
             response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.8, top_k=50)  # Adjust as needed
+            end_time = time.time()
+            elapsed_time = end_time - start_time
 
             # Process the response
             new_result = response['choices'][0]['text'].replace("\n", "")
@@ -89,17 +107,17 @@ def hana_ai(input_text, model=None):
 
             new_result = truncate_at_newline(new_result)
 
-            print(f"Hana said (via GGUF): {new_result}")
+            log_debug(f"Model response: {new_result} (Processed in {elapsed_time:.2f}s)")
 
             append_to_history_file(memory_path, input_text, new_result)
 
             return new_result
         except Exception as e:
-            print(f"Error using GGUF model: {e}")
+            log_debug(f"Error using GGUF model: {e}")
             return "Error using the local model. Please check the model setup."
     
     # If no local model is provided, fallback to WebUI
-    print("No local model provided. Falling back to WebUI.")
+    log_debug("No local model provided. Falling back to WebUI.")
     try:
         url = f"{os.getenv('Text-Generation')}/v1/completions"
         headers = {"Content-Type": "application/json"}
@@ -113,7 +131,10 @@ def hana_ai(input_text, model=None):
             "top_k": 50,
         }
 
+        start_time = time.time()
         response = requests.post(url, headers=headers, json=data, verify=False)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
         if response.status_code == 200:
             results = json.loads(response.content.decode('utf-8'))["choices"][0]["text"]
             new_result = results.replace("\n", "")
@@ -122,16 +143,16 @@ def hana_ai(input_text, model=None):
 
             new_result = truncate_at_newline(new_result)
 
-            print(f"Hana said (via WebUI): {new_result}")
+            log_debug(f"WebUI response: {new_result} (Processed in {elapsed_time:.2f}s)")
 
             append_to_history_file(memory_path, input_text, new_result)
 
             return new_result
         else:
-            print(f"WebUI request failed with status code: {response.status_code}")
+            log_debug(f"WebUI request failed with status code: {response.status_code}")
             return "Failed to connect to WebUI."
     except Exception as e:
-        print(f"Error connecting to WebUI: {e}")
+        log_debug(f"Error connecting to WebUI: {e}")
         return "WebUI connection error."
 
 # Helper function to truncate at newlines

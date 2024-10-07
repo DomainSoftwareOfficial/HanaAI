@@ -21,4 +21,5 @@ Build/
 
 Distribution/
 
+.gitignore
 .env

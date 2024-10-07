@@ -10,6 +10,7 @@ import emoji
 import shutil
 import queue
 import re
+import textwrap
 from dotenv import load_dotenv
 from chloe import CWindow
 from hana import HWindow
@@ -63,8 +64,9 @@ class TextBoxFrame(ctk.CTkFrame):
                 # Create an empty file
                 with open(self.file_path, 'w') as file:
                     file.write("")
+                self.fancy_log("📂 File Created", f"Created file at {self.file_path}.", width=100)
         except Exception as e:
-            print(f"Error ensuring file exists: {e}")
+            self.fancy_log("❌ Error", f"Error ensuring file exists: {e}", width=100)
 
     def load_content(self):
         try:
@@ -73,16 +75,18 @@ class TextBoxFrame(ctk.CTkFrame):
             self.textbox.delete("1.0", ctk.END)
             self.textbox.insert(ctk.END, content)
             self.textbox.see(ctk.END)  # Ensure the content is visible
+            self.fancy_log("📥 Content Loaded", f"Loaded content from {self.file_path}.", width=100)
         except Exception as e:
-            print(f"Error loading content: {e}")
+            self.fancy_log("❌ Error", f"Error loading content: {e}", width=100)
 
     def save_content(self, event=None):
         try:
             content = self.textbox.get("1.0", ctk.END).strip()  # Strip trailing newlines
             with open(self.file_path, 'w') as file:
                 file.write(content)
+            self.fancy_log("💾 Content Saved", f"Saved content to {self.file_path}.", width=100)
         except Exception as e:
-            print(f"Error saving content: {e}")
+            self.fancy_log("❌ Error", f"Error saving content: {e}", width=100)
 
     def monitor_file(self):
         last_modified = os.path.getmtime(self.file_path)
@@ -94,11 +98,38 @@ class TextBoxFrame(ctk.CTkFrame):
                     last_modified = current_modified
                     self.load_content()
             except Exception as e:
-                print(f"Error monitoring file changes: {e}")
+                self.fancy_log("❌ Error", f"Error monitoring file changes: {e}", width=100)
 
+    def fancy_log(self, header, body, width=100):
+        # Ensure the width is an integer
+        try:
+            width = int(width)
+        except ValueError:
+            raise TypeError("Width must be an integer.")
+
+        # Prepare border and formatting
+        separator = f"+{'-' * (width - 2)}+"
+        border_top = f"+{'=' * (width - 2)}+"
+
+        # Center the header across the width, allowing space for borders and extra space
+        # Using max to ensure minimum width for the header
+        header_row = f" {header.center(width - 5)} "
+
+        # Strip leading/trailing whitespace and replace newlines with a space
+        body = body.strip().replace("\n", " ")
+
+        # Wrap the body text to fit within the given width, allowing extra padding
+        body_lines = textwrap.wrap(body, width=width - 10)  # Leave space for "|  " and "  |"
+        body_rows = '\n'.join([f"|    {line.ljust(width - 10)}    |" for line in body_lines])
+
+        # Print the fancy log with connected borders
+        print(f"{border_top}\n|{header_row}|\n{separator}\n{body_rows}\n{border_top}")
+        
 class App(ctk.CTk):
     def __init__(self, microphone_index=None, output_device_index=None, selected_platform="None", selected_llm=None):
         super().__init__()
+
+        self.fancy_log("⚙️ INITIALIZATION ", "Starting Control Panel...", width=100)
 
         self.title("Control Panel")
         self.geometry("640x800")  # Increased height to accommodate the new layout
@@ -109,13 +140,14 @@ class App(ctk.CTk):
         self.selected_platform = selected_platform
         self.selected_output_device_index = output_device_index
 
-        print(f"Playing audio on device index: {self.selected_output_device_index}")
-        print(f"Using services: {self.selected_platform}")
-        print(f"Inputting audio on device index: {self.selected_mic_index}")
+        self.fancy_log("🔊 AUDIO SETTINGS", f"Playing audio on device index: {self.selected_output_device_index}", width=100)
+        self.fancy_log("🌐 PLATFORM SETTINGS", f"Using services: {self.selected_platform}", width=100)
+        self.fancy_log("🎙️ MICROPHONE SETTINGS", f"Inputting audio on device index: {self.selected_mic_index}", width=100)
 
 
         self.folder_to_clear = self.resource_path('../Data/Output')
         self.delete_all_files_in_folder(self.folder_to_clear)
+        self.fancy_log("🗑️ FOLDER CLEANUP", f"Cleared folder: {self.folder_to_clear}", width=100)
 
         self.after_id = None
         self.youtube_handler = None
@@ -146,6 +178,8 @@ class App(ctk.CTk):
         with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
                 superviewer_file.write('')  # Empty the file content after use
 
+        self.fancy_log("📂 FILE INITIALIZATION", "Superchat and Superviewer files cleared.", width=100)
+
         # Initialize LLM model to None
         self.llm_model = None
 
@@ -153,19 +187,19 @@ class App(ctk.CTk):
 
         # Load the selected LLM model if one is provided
         if self.selected_llm:
-            print(f"Loading LLM model from: {self.selected_llm}")
+            self.fancy_log("🤖 LLM MODEL", f"Loading LLM model from: {self.selected_llm}", width=100)
             self.llm_model = load_model(self.selected_llm)
             if self.llm_model:
-                print("Model loaded successfully!")
+                self.fancy_log("🤖 LLM MODEL", "Model loaded successfully!", width=100)
             else:
-                print("Failed to load the model.")
+                self.fancy_log("🤖 LLM MODEL", "Failed to load the model.", width=100)
         else:
-            print("No LLM model selected.")
+            self.fancy_log("🤖 LLM MODEL", "No LLM model selected.", width=100)
 
-        # Load Whisper large model during initialization
-        print("Loading Whisper large model...")
-        self.whisper_model = whisper.load_model("base")
-        print("Whisper large model loaded.")
+        # Whisper model initialization
+        self.fancy_log("🔈 WHISPER", "Loading Whisper large model...", width=100)
+        self.whisper_model = whisper.load_model("large")
+        self.fancy_log("🔈 WHISPER", "Whisper large model loaded.", width=100)
 
         # Create a frame for the search bar at the top
         search_frame = ctk.CTkFrame(self)
@@ -182,6 +216,7 @@ class App(ctk.CTk):
         # Bind the search entry's key release event to handle input changes
         self.search_entry.bind("<KeyRelease>", self.on_search_change)
 
+        self.fancy_log("🖥️ UI SETUP", "Search bar and input elements initialized.", width=100)
 
         # File paths (adjust these to match your directory structure)
         files = [
@@ -201,6 +236,8 @@ class App(ctk.CTk):
             frame = TextBoxFrame(self, file)
             frame.grid(row=(i // 2) + 1, column=i % 2, padx=10, pady=10)  # Text boxes start at row 1
 
+        self.fancy_log("🖥️ UI SETUP", "Text boxes created.", width=100)
+
         # Adjust the button frame row placement to ensure it is below the text boxes
         button_frame = ctk.CTkFrame(self)
         button_frame.grid(row=4, column=0, columnspan=2, pady=10, sticky="ew")  # Shifted to row 4 to account for the search bar and text boxes
@@ -218,6 +255,7 @@ class App(ctk.CTk):
                 button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.chloe_stop)
             button.grid(row=0, column=i, padx=10, pady=5, sticky="ew")
 
+        self.fancy_log("🖥️ UI SETUP", "Control buttons created.", width=100)
 
         # Adjust the lower frame row placement as well
         lower_frame = ctk.CTkFrame(self)
@@ -296,6 +334,8 @@ class App(ctk.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
+        self.fancy_log("⚙️ INITIALIZATION", "Control Panel fully initialized.", width=100)
+
     def on_search_change(self, event):
         # Cancel any existing scheduled print function
         if self.after_id:
@@ -306,13 +346,14 @@ class App(ctk.CTk):
 
         # Schedule a new function to run after 2 seconds
         self.after_id = self.after(2000, mainrag, current_text)
+        self.fancy_log("🔍 Search", f"Search updated to: {current_text}", width=100)
         
     def delete_all_files_in_folder(self, folder_path):
         """Delete all files in the specified folder."""
         try:
             # Check if the folder exists
             if not os.path.exists(folder_path):
-                print(f"Folder '{folder_path}' does not exist.")
+                self.fancy_log("⚠️ Folder Error", f"Folder '{folder_path}' does not exist.", width=100)
                 return
 
             # List all files and directories in the folder
@@ -323,16 +364,16 @@ class App(ctk.CTk):
                 if os.path.isfile(file_path):
                     # Delete the file
                     os.remove(file_path)
-                    print(f"Deleted file: {file_path}")
+                    self.fancy_log("🗑️ File Deleted", f"Deleted file: {file_path}", width=100)
                 elif os.path.isdir(file_path):
                     # Delete the directory and all its contents
                     shutil.rmtree(file_path)
-                    print(f"Deleted directory: {file_path}")
+                    self.fancy_log("🗑️ Directory Deleted", f"Deleted directory: {file_path}", width=100)
 
-            print(f"All files in folder '{folder_path}' have been deleted.")
+            self.fancy_log("✅ Success", f"All files in folder '{folder_path}' have been deleted.", width=100)
 
         except Exception as e:
-            print(f"Error occurred while deleting files: {e}")
+            self.fancy_log("❌ Error", f"Error occurred while deleting files: {e}", width=100)
 
     def create_text_file(self, button_text):
         """Function to create a text file based on the button clicked."""
@@ -352,11 +393,11 @@ class App(ctk.CTk):
                 file.write(file_contents[button_text])
 
             # Show a confirmation message
-            print("File Created", f"{button_text}.txt has been created!")
+            self.fancy_log("📝 File Created", f"{button_text}.txt has been created!", width=100)
 
         except Exception as e:
             # Show an error message if file creation fails
-            print("Error", f"Could not create file: {str(e)}")
+            self.fancy_log("❌ Error", f"Could not create file: {str(e)}", width=100)
 
     def get_active_language(self):
         # Maps the switch to the language code
@@ -375,28 +416,28 @@ class App(ctk.CTk):
             return 'en'
 
     def toggle_mic(self):
-        print("toggle_mic called")
-        print(f"Before toggle: mic_on_active = {self.mic_on_active}")
-        
+        self.fancy_log("🎤 Mic Toggle", "toggle_mic called", width=100)
+        self.fancy_log("🎤 Mic State", f"Before toggle: mic_on_active = {self.mic_on_active}", width=100)
+
         if not self.mic_on_active:
             # Activate Mic On
-            print("Activating Mic On...")
+            self.fancy_log("🎤 Mic", "Activating Mic On...", width=100)
             self.mic_on_active = True
             self.long_button.configure(text="Mic Off")
             
             # Pause random_picker and monitor_file
-            print("Pausing random_picker and monitor_file... waiting for them to finish.")
+            self.fancy_log("⏸️ Pause", "Pausing random_picker and monitor_file... waiting for them to finish.", width=100)
             self.pause_event.set()  # Pause random_picker
             self.stop_monitor_file.set()  # Pause monitor_file
             
             # Start mic processing in a separate thread
-            print("Starting mic processing.")
+            self.fancy_log("🎤 Mic", "Starting mic processing.", width=100)
             self.mic_thread = threading.Thread(target=self.record, daemon=True)
             self.mic_thread.start()
         
         else:
             # Deactivate Mic On
-            print("Deactivating Mic On...")
+            self.fancy_log("🎤 Mic", "Deactivating Mic On...", width=100)
             self.mic_on_active = False
             self.long_button.configure(text="Mic On")
             
@@ -404,15 +445,15 @@ class App(ctk.CTk):
             self.stop_mic_processing = True
             
             # Resume random_picker and monitor_file
-            print("Resuming random_picker and monitor_file...")
+            self.fancy_log("▶️ Resume", "Resuming random_picker and monitor_file...", width=100)
             self.pause_event.clear()  # Resume random_picker
             self.stop_monitor_file.clear()  # Resume monitor_file
 
-        print(f"After toggle: mic_on_active = {self.mic_on_active}")
+        self.fancy_log("🎤 Mic State", f"After toggle: mic_on_active = {self.mic_on_active}", width=100)
 
     def record(self):
         # Ensure that when Mic On is activated, random_picker is paused
-        print("Pausing random_picker for microphone input.")
+        self.fancy_log("🎤 Mic Recording", "Pausing random_picker for microphone input.", width=100)
         self.is_recording.set()  # Signal that recording is active
         self.pause_event.set()    # Pause random_picker
 
@@ -422,36 +463,36 @@ class App(ctk.CTk):
 
         # Wait until monitor_file is not active
         if self.monitor_thread is not None and self.monitor_thread.is_alive():
-            print("Waiting for monitor_file to complete...")
+            self.fancy_log("⌛ Waiting", "Waiting for monitor_file to complete...", width=100)
             while self.monitor_thread.is_alive():
                 time.sleep(0.1)
 
         # Start recording and processing
         while self.mic_on_active and not self.stop_mic_processing:
-            print("Starting recording and processing cycle...")
+            self.fancy_log("🎤 Recording", "Starting recording and processing cycle...", width=100)
             self.record_and_process_audio()  # This should be non-blocking
             
             # Add a short sleep to avoid busy waiting
             time.sleep(0.5)
 
         # Reset flags to resume random_picker
-        print("Resuming random_picker...")
+        self.fancy_log("▶️ Resume", "Resuming random_picker...", width=100)
         self.is_recording.clear()
         self.pause_event.clear()
 
     def record_and_process_audio(self):
         # 1. Record audio from the microphone
         output_audio_path = self.resource_path('../Assets/Audio/user.wav')  # Adjust path as needed
-        print("Recording audio from microphone...")
+        self.fancy_log("🎤 Recording audio", "Recording audio from microphone...", width=100)
         record_audio(output_file=output_audio_path, mic_index=1, sample_rate=48000, chunk_size=1024, max_record_seconds=300)
 
         # 2. Transcribe the recorded audio using Whisper
-        print("Transcribing audio using Whisper...")
+        self.fancy_log("💬 Transcribing audio", "Using Whisper to transcribe the audio...", width=100)
         transcription = self.whisper_transcribe(output_audio_path)
 
         # 3. Translate the transcription based on the active language switch
         active_language = self.get_active_language()
-        print(f"Translating transcription to {active_language}...")
+        self.fancy_log("🌍 Translating transcription", f"Translating transcription to {active_language}...", width=100)
         translated_text = translate(transcription, active_language)
 
         # 4. Save the translated transcript to a .hana file
@@ -459,40 +500,40 @@ class App(ctk.CTk):
         try:
             with open(transcript_file_path, 'w', encoding='utf-8') as hana_file:
                 hana_file.write(translated_text)
-            print(f"Translated transcript saved to {transcript_file_path}.")
+            self.fancy_log("💾 Transcript saved", f"Translated transcript saved to {transcript_file_path}.", width=100)
         except Exception as e:
-            print(f"Error saving transcript: {e}")
+            self.fancy_log("❌ Error", f"Error saving transcript: {e}", width=100)
 
         # 5. Use TTS to generate a response based on the translation
-        print("Generating audio response using TTS...")
+        self.fancy_log("🗣️ Generating audio", "Generating audio response using TTS...", width=100)
         tts_function = self.get_active_tts_function()
         if tts_function:
             ai_output_path = self.resource_path('../Assets/Audio/ai.wav')  # Adjust path as needed
             try:
                 tts_function(translated_text, output_path=ai_output_path)
-                print(f"TTS audio saved to {ai_output_path}.")
+                self.fancy_log("🔊 TTS audio saved", f"TTS audio saved to {ai_output_path}.", width=100)
             except Exception as e:
-                print(f"Error generating TTS audio: {e}")
+                self.fancy_log("❌ Error", f"Error generating TTS audio: {e}", width=100)
                 return  # Skip further processing if TTS fails
 
             # 6. Process the audio using mainrvc and play the output
             hana_output_path = self.resource_path('../Assets/Audio/hana.wav')  # Adjust path as needed
             try:
-                print("Processing audio with mainrvc...")
+                self.fancy_log("🎶 Processing audio", "Processing audio with mainrvc...", width=100)
                 mainrvc(ai_output_path, hana_output_path)
-                print(f"Processed audio saved to {hana_output_path}.")
+                self.fancy_log("💽 Processed audio saved", f"Processed audio saved to {hana_output_path}.", width=100)
             except Exception as e:
-                print(f"Error processing audio with mainrvc: {e}")
+                self.fancy_log("❌ Error", f"Error processing audio with mainrvc: {e}", width=100)
                 return  # Skip playback if processing fails
 
             try:
-                print("Playing processed audio...")
+                self.fancy_log("▶️ Playing audio", "Playing processed audio...", width=100)
                 play(hana_output_path, self.selected_output_device_index)
-                print("Audio playback completed.")
+                self.fancy_log("✅ Playback completed", "Audio playback completed.", width=100)
             except Exception as e:
-                print(f"Error playing audio: {e}")
+                self.fancy_log("❌ Error", f"Error playing audio: {e}", width=100)
         else:
-            print("No TTS function is active. Cannot generate audio response.")
+            self.fancy_log("❌ Error", "No TTS function is active. Cannot generate audio response.", width=100)
 
         # Optional sleep or other logic
         time.sleep(3)
@@ -502,10 +543,10 @@ class App(ctk.CTk):
         try:
             result = self.whisper_model.transcribe(audio_path)
             transcription = result['text']
-            print(f"Transcription result: {transcription}")
+            self.fancy_log("✅ Transcription result", f"Transcription result: {transcription}", width=100)
             return transcription
         except Exception as e:
-            print(f"Error during transcription: {e}")
+            self.fancy_log("❌ Error", f"Error during transcription: {e}", width=100)
             return ""
 
     def get_active_tts_function(self):
@@ -539,7 +580,7 @@ class App(ctk.CTk):
         # Stop only the random picker thread
         self.stop_random_picker.set()  # Signal the picker thread to stop
 
-        print("Random picker stopped. Chat handlers still running.")
+        self.fancy_log("⏹️ Random Picker", "Random picker stopped. Chat handlers still running.", width=100)
 
     def chloe_start(self):
         # Clear any stop signals and start the monitoring thread
@@ -547,14 +588,14 @@ class App(ctk.CTk):
         self.pause_event.clear()        # Ensure the pause event is clear
         self.monitor_thread = threading.Thread(target=self.monitor_file, daemon=True)
         self.monitor_thread.start()     # Start the monitoring thread
-        print("Chloe AI monitoring started.")
+        self.fancy_log("📡 Chloe AI", "Chloe AI monitoring started.", width=100)
 
     def chloe_stop(self):
         # Set the stop signal and clear any pause event to ensure the monitor stops cleanly
         self.stop_monitor_file.set()  # Signal to stop the monitoring thread
         self.new_file_ready_event.set()  # Unblock monitor if waiting
         self.pause_event.clear()      # Ensure the pause event is clear
-        print("Stopping Chloe AI monitoring...")
+        self.fancy_log("⏹️ Chloe AI", "Stopping Chloe AI monitoring...", width=100)
 
     def start_youtube_chat(self):
         load_dotenv()
@@ -664,7 +705,7 @@ class App(ctk.CTk):
         while not self.stop_random_picker.is_set():  # Check if the stop event is set
             if self.is_recording.is_set():
                 # If recording is active, skip processing
-                print("Random picker is paused due to active recording.")
+                self.fancy_log("⏸️  PAUSED", "Random Picker is paused because recording is active.")
                 time.sleep(1)  # Small sleep to prevent busy-waiting
                 continue
 
@@ -676,14 +717,14 @@ class App(ctk.CTk):
                 if superchat_content and superchat_content != last_superchat_content:
                     # New content detected in superchat.chloe
                     last_superchat_content = superchat_content
-                    print("Detected new content in superchat.chloe, pausing random_picker for monitor_file.")
+                    self.fancy_log("🔔 SUPERCHAT DETECTED", "New content detected in superchat.chloe!\nPausing random_picker for monitor_file.")
                     self.pause_event.set()  # Pause random_picker
                     self.new_file_ready_event.set()  # Notify monitor_file
                     time.sleep(5)
                     continue
 
             if self.pause_event.is_set():
-                print("Random picker is paused for Chloe AI processing.")
+                self.fancy_log("⏸️  PROCESSING", "Random Picker is paused for Chloe AI processing...")
                 while self.pause_event.is_set() and not self.stop_random_picker.is_set():
                     time.sleep(1)
 
@@ -708,14 +749,15 @@ class App(ctk.CTk):
 
                     # Before processing the input_text, validate if it's a proper UTF-8 string
                     if not self.is_valid_utf8(input_text):
-                        print(f"Skipping invalid UTF-8 input: {input_text}")
+                        self.fancy_log("⚠️ INVALID UTF-8", f"Skipping invalid UTF-8 input: '{input_text}'")
                         continue  # Skip this iteration if the input text has encoding issues
 
                     if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
-                        print(f"Skipping invalid or empty input: {input_text}")
+                        self.fancy_log("⚠️ INVALID INPUT", f"Skipping invalid or empty input: '{input_text}'")
 
                         # Now call handle_command if it starts with '!'
                         if input_text.startswith('!'):
+                            self.fancy_log("🛠️ COMMAND", f"Detected command: {input_text}")
                             self.handle_command(input_text)
 
                         time.sleep(5)
@@ -731,6 +773,7 @@ class App(ctk.CTk):
                     viewer_text = "User"
                     self.predefined_input_flag = True
                     self.cycle_active = True  # Start the cycle
+                    self.fancy_log("🎲 RANDOM PICK", f"Chose predefined input: '{input_text}'")
                 else:
                     index = random.randint(0, 2)
 
@@ -744,14 +787,15 @@ class App(ctk.CTk):
 
                     # Before processing the input_text, validate if it's a proper UTF-8 string
                     if not self.is_valid_utf8(input_text):
-                        print(f"Skipping invalid UTF-8 input: {input_text}")
+                        self.fancy_log("⚠️ INVALID UTF-8", f"Skipping invalid UTF-8 input: '{input_text}'")
                         continue  # Skip this iteration if the input text has encoding issues
 
                     if not input_text or input_text.startswith('!') or self.contains_emoji_or_emote(input_text):
-                        print(f"Skipping invalid or empty input: {input_text}")
+                        self.fancy_log("⚠️ INVALID INPUT", f"Skipping invalid or empty input: '{input_text}'")
 
                         # Now call handle_command if it starts with '!'
                         if input_text.startswith('!'):
+                            self.fancy_log("🛠️ COMMAND", f"Detected command: {input_text}")
                             self.handle_command(input_text)
 
                         time.sleep(5)
@@ -765,6 +809,7 @@ class App(ctk.CTk):
                 target_language = self.get_active_language()
                 if target_language:
                     input_text = translate(input_text, target_language)
+                    self.fancy_log("🌍 TRANSLATION", f"Translated input to {target_language}: '{input_text}'")
 
             formatted_string = f"System: {viewer_text} said: {input_text}"
 
@@ -784,6 +829,7 @@ class App(ctk.CTk):
                 output_file_path = self.resource_path('../Data/Output/output.hana')
                 with open(output_file_path, 'w', encoding='utf-8') as outfile:
                     outfile.write(processed_string)
+                self.fancy_log("💾 OUTPUT SAVED", "Processed string saved to output.hana")
 
                 # Select the TTS function based on the active language switch or default to English
                 tts_function = self.get_active_tts_function() if any_switch_toggled else tts_en
@@ -805,7 +851,7 @@ class App(ctk.CTk):
 
                     # Notify monitor_file that a new file is ready
                     if self.predefined_input_flag:
-                        print("Running Monitor_File")
+                        self.fancy_log("🔄 MONITOR FILE", "Running monitor_file after predefined input.")
                         self.new_file_ready_event.set()
                         self.predefined_input_flag = False
 
@@ -814,14 +860,15 @@ class App(ctk.CTk):
                     # Play the generated hana.wav file
                     # play(hana_output_path, self.selected_output_device_index)
                 else:
-                    print("No TTS function is active. Cannot generate audio.")
+                    self.fancy_log("⚠️ ERROR", "No TTS function is active. Cannot generate audio.")
                     continue  # Skip if no TTS function is available
             else:
-                print("Skipping repeated input text.")
+                self.fancy_log("🔁 DUPLICATE DETECTED", "Skipping repeated input text.")
 
             time.sleep(5)
 
-        print("Exiting random picker thread.")
+        self.fancy_log("🛑 EXIT", "Exiting random picker thread.")
+
         
     def monitor_file(self):
         chloe_file_path = self.resource_path('../Data/Output/output.hana')
@@ -837,10 +884,10 @@ class App(ctk.CTk):
                 time.sleep(1)
 
             if self.stop_monitor_file.is_set():
-                print("Stopping monitor_file as stop signal is set.")
+                self.fancy_log("🛑 MONITOR", "Stopping monitor_file as stop signal is set.", width=100)
                 break
 
-            print("Pausing random_picker...")
+            self.fancy_log("⏸️ PAUSE", "Pausing random_picker...", width=100)
             self.pause_event.set()
 
             try:
@@ -900,30 +947,30 @@ class App(ctk.CTk):
                         if self.chloe_window and isinstance(self.chloe_window, CWindow):
                             self.chloe_window.update_textbox("")  # Clear the text
 
-                        print(f"Generated distorted audio for Chloe: {distorted_output_path}")
+                        self.fancy_log("🎧 AUDIO", f"Generated distorted audio for Chloe: {distorted_output_path}", width=100)
                     else:
-                        print("No TTS function is active. Skipping audio generation.")
+                        self.fancy_log("⚠️ WARNING", "No TTS function is active. Skipping audio generation.", width=100)
 
                     # Signal to random_picker that the cycle can continue
                     self.new_file_ready_event.set()
                 else:
-                    print(f"File {chloe_file_path} was empty, skipping processing.")
+                    self.fancy_log("📝 EMPTY FILE", f"File {chloe_file_path} was empty, skipping processing.", width=100)
             except Exception as e:
-                print(f"Error processing Chloe file: {str(e)}")
+                self.fancy_log("❌ ERROR", f"Error processing Chloe file: {str(e)}", width=100)
             finally:
-                print("Resuming random_picker...")
+                self.fancy_log("▶️ RESUME", "Resuming random_picker...", width=100)
                 self.pause_event.clear()
                 self.new_file_ready_event.clear()
 
             time.sleep(5)
 
-        print("Exiting monitor_file thread.")
+        self.fancy_log("🔚 EXIT", "Exiting monitor_file thread.", width=100)
 
     def handle_command(self, command):
         """
         General handler for commands starting with '!'.
         """
-        print(f"Handling command: {command}")
+        self.fancy_log("🛠️ COMMAND", f"Handling command: {command}", width=100)
 
         # Handle the !draw command only if Art-On is set to True
         if command.startswith('!draw'):
@@ -931,9 +978,9 @@ class App(ctk.CTk):
             if os.getenv('Art-On', 'False').lower() == 'true':
                 self.handle_draw_command(command)
             else:
-                print("Art-On is disabled, ignoring !draw command.")
+                self.fancy_log("🎨 ART MODE", "Art-On is disabled, ignoring !draw command.", width=100)
         else:
-            print(f"Unknown command received: {command}")
+            self.fancy_log("❓ UNKNOWN", f"Unknown command received: {command}", width=100)
 
     def handle_draw_command(self, command):
         # Strip !draw from the command
@@ -987,6 +1034,31 @@ class App(ctk.CTk):
             # Otherwise, use the current directory
             base_path = os.path.abspath(".")
         return os.path.join(base_path, relative_path)
+
+    def fancy_log(self, header, body, width=100):
+        # Ensure the width is an integer
+        try:
+            width = int(width)
+        except ValueError:
+            raise TypeError("Width must be an integer.")
+
+        # Prepare border and formatting
+        separator = f"+{'-' * (width - 2)}+"
+        border_top = f"+{'=' * (width - 2)}+"
+
+        # Center the header across the width, allowing space for borders and extra space
+        # Using max to ensure minimum width for the header
+        header_row = f" {header.center(width - 5)} "
+
+        # Strip leading/trailing whitespace and replace newlines with a space
+        body = body.strip().replace("\n", " ")
+
+        # Wrap the body text to fit within the given width, allowing extra padding
+        body_lines = textwrap.wrap(body, width=width - 10)  # Leave space for "|  " and "  |"
+        body_rows = '\n'.join([f"|    {line.ljust(width - 10)}    |" for line in body_lines])
+
+        # Print the fancy log with connected borders
+        print(f"{border_top}\n|{header_row}|\n{separator}\n{body_rows}\n{border_top}")
 
     def open_window1(self):
         self.chloe_window = CWindow()
