@@ -9,7 +9,7 @@ import numpy as np
 from pydub import AudioSegment
 from pydub.playback import _play_with_simpleaudio
 import os
-import warnings
+import time
 from dotenv import load_dotenv
 from transformers import MarianMTModel, MarianTokenizer
 from langdetect import detect, DetectorFactory
@@ -271,27 +271,63 @@ def list_output_devices():
     
     return output_devices
 
-def record_audio(output_file, mic_index, sample_rate=44100, chunk_size=1024, record_seconds=10):
+def record_audio(output_file, mic_index, sample_rate=48000, chunk_size=1024, max_record_seconds=300, silence_threshold=500, silence_duration=5):
     p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paInt16,
-                    channels=1,
-                    rate=sample_rate,
+    stream = p.open(format=pyaudio.paInt16,  # 16-bit format
+                    channels=2,  # 2 channels (stereo)
+                    rate=sample_rate,  # 48000 Hz sample rate
                     input=True,
                     input_device_index=mic_index,
                     frames_per_buffer=chunk_size)
+
     print("* recording")
     frames = []
-    for i in range(0, int(sample_rate / chunk_size * record_seconds)):
+    silent_chunks = 0
+    max_silent_chunks = int(sample_rate / chunk_size * silence_duration)  # Max silent chunks for 5 seconds of silence
+
+    start_time = time.time()
+
+    # Keep recording until max_record_seconds is reached, but stop earlier if 5 seconds of silence is detected
+    while True:
         data = stream.read(chunk_size, exception_on_overflow=False)
         frames.append(data)
-    print("* done recording")
+        
+        # Convert the byte data to numpy array to calculate RMS
+        audio_data = np.frombuffer(data, dtype=np.int16)
+        rms = np.sqrt(np.mean(audio_data**2))
+
+        # Print recording indicator on the same line
+        print(f"\r* recording... RMS: {rms:.2f}", end='', flush=True)
+
+        # Check for silence (RMS lower than threshold)
+        if rms < silence_threshold:
+            silent_chunks += 1
+        else:
+            silent_chunks = 0  # Reset silent counter if sound is detected
+        
+        # If there are 5 seconds of continuous silence, stop recording
+        if silent_chunks >= max_silent_chunks:
+            print("\n* 5 seconds of silence detected. Stopping recording.")
+            break
+
+        # Stop after reaching max_record_seconds regardless of silence
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= max_record_seconds:
+            print("\n* Maximum recording time reached. Stopping recording.")
+            break
+
+    total_elapsed_time = time.time() - start_time
+    print(f"\n* Done recording. Total time: {total_elapsed_time:.2f} seconds.")
+
     stream.stop_stream()
     stream.close()
     p.terminate()
+
+    # Save the recorded audio to a .wav file
     wf = wave.open(output_file, 'wb')
-    wf.setnchannels(1)
-    wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-    wf.setframerate(sample_rate)
+    wf.setnchannels(2)  # Save the recording as 2-channel audio
+    wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))  # 16-bit audio
+    wf.setframerate(sample_rate)  # 48000 Hz sample rate
     wf.writeframes(b''.join(frames))
     wf.close()
 
@@ -378,7 +414,7 @@ def play(file_path, output_device_index=None):
     
     print(f"Audio playback finished for {file_path}")
 
-
         
 if __name__ == "__main__":
-    distort("../Assets/Audio/ai.wav", "../Assets/Audio/radio.mp3", output_file_path="../Assets/Audio/chloe.wav")
+    record_audio(output_file='../Assets/Audio/user.wav', mic_index=1, sample_rate=48000, chunk_size=1024, max_record_seconds=300)
+

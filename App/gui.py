@@ -128,6 +128,9 @@ class App(ctk.CTk):
         self.processing = False  # To track if the thread is processing
         self.chloe_window_active = False
         self.hana_window_active = False
+        self.mic_on_active = False  # Initialize the attribute
+        self.stop_mic_processing = False  # Flag to stop mic processing
+
 
         self.known_emotes = []
 
@@ -158,6 +161,11 @@ class App(ctk.CTk):
                 print("Failed to load the model.")
         else:
             print("No LLM model selected.")
+
+        # Load Whisper large model during initialization
+        print("Loading Whisper large model...")
+        self.whisper_model = whisper.load_model("base")
+        print("Whisper large model loaded.")
 
         # Create a frame for the search bar at the top
         search_frame = ctk.CTkFrame(self)
@@ -246,8 +254,8 @@ class App(ctk.CTk):
         self.is_recording = threading.Event()  # Event to signal when recording is active
 
         # Long button
-        long_button = ctk.CTkButton(left_frame, text="Mic On", corner_radius=0, command=self.start_recording)
-        long_button.grid(row=4, column=1, columnspan=4, pady=10, sticky="ew")
+        self.long_button = ctk.CTkButton(left_frame, text="Mic On", corner_radius=0, command=self.toggle_mic)
+        self.long_button.grid(row=4, column=1, columnspan=4, pady=10, sticky="ew")
 
         # Right frame (Stacked Buttons)
         right_frame = ctk.CTkFrame(lower_frame)
@@ -366,60 +374,139 @@ class App(ctk.CTk):
         else:
             return 'en'
 
-    def start_recording(self):
-        output_file = self.resource_path('../Assets/Audio/user.wav')
-        self.is_recording.set()  # Set the event indicating recording is active
-        threading.Thread(target=self.record_and_process_audio, args=(output_file,)).start()
-
-    def record_and_process_audio(self, output_file):
-        try:
-            self.is_recording.set()  # Set the event indicating recording is active
-
-            # Step 1: Record audio
-            record_audio(output_file, self.selected_mic_index, record_seconds=10)  # Increased recording time to 10 seconds
-
-            # Step 2: Transcribe audio using Whisper
-            model = whisper.load_model("large", device="cuda")
-            result = model.transcribe(output_file)
-            transcribed_text = result['text']
-
-            # Log the transcription result
-            print(f"Transcribed text: {transcribed_text}")
+    def toggle_mic(self):
+        print("toggle_mic called")
+        print(f"Before toggle: mic_on_active = {self.mic_on_active}")
+        
+        if not self.mic_on_active:
+            # Activate Mic On
+            print("Activating Mic On...")
+            self.mic_on_active = True
+            self.long_button.configure(text="Mic Off")
             
-            # Print the transcribed text to the console
-            print(f"Transcribed Text: {transcribed_text}")
+            # Pause random_picker and monitor_file
+            print("Pausing random_picker and monitor_file... waiting for them to finish.")
+            self.pause_event.set()  # Pause random_picker
+            self.stop_monitor_file.set()  # Pause monitor_file
+            
+            # Start mic processing in a separate thread
+            print("Starting mic processing.")
+            self.mic_thread = threading.Thread(target=self.record, daemon=True)
+            self.mic_thread.start()
+        
+        else:
+            # Deactivate Mic On
+            print("Deactivating Mic On...")
+            self.mic_on_active = False
+            self.long_button.configure(text="Mic On")
+            
+            # Signal to stop mic processing
+            self.stop_mic_processing = True
+            
+            # Resume random_picker and monitor_file
+            print("Resuming random_picker and monitor_file...")
+            self.pause_event.clear()  # Resume random_picker
+            self.stop_monitor_file.clear()  # Resume monitor_file
 
-            # Step 3: Determine which TTS function to use based on active switch
-            tts_function = self.get_active_tts_function()
+        print(f"After toggle: mic_on_active = {self.mic_on_active}")
 
-            if tts_function:
-                # Step 4: Generate ai.wav using the selected TTS function
-                ai_output_path = self.resource_path('../Assets/Audio/ai.wav')
-                tts_function(transcribed_text, output_path=ai_output_path)
-            else:
-                print("No TTS switch is active. Using default TTS (English).")
-                ai_output_path = self.resource_path('../Assets/Audio/ai.wav')
-                tts_en(transcribed_text, output_path=ai_output_path)
+    def record(self):
+        # Ensure that when Mic On is activated, random_picker is paused
+        print("Pausing random_picker for microphone input.")
+        self.is_recording.set()  # Signal that recording is active
+        self.pause_event.set()    # Pause random_picker
 
-            # Print a message when the audio file is created
-            print(f"Audio file created at: {ai_output_path}")
+        # Wait until random_picker acknowledges the pause
+        while not self.pause_event.is_set():
+            time.sleep(0.1)
 
-            # Step 5: Process the generated ai.wav file using mainrvc and save it as hana.wav
-            hana_output_path = self.resource_path('../Assets/Audio/hana.wav')
-            mainrvc(ai_output_path, hana_output_path)
+        # Wait until monitor_file is not active
+        if self.monitor_thread is not None and self.monitor_thread.is_alive():
+            print("Waiting for monitor_file to complete...")
+            while self.monitor_thread.is_alive():
+                time.sleep(0.1)
 
-            # Print a message when the hana.wav file is created
-            print(f"Hana audio file created at: {hana_output_path}")
+        # Start recording and processing
+        while self.mic_on_active and not self.stop_mic_processing:
+            print("Starting recording and processing cycle...")
+            self.record_and_process_audio()  # This should be non-blocking
+            
+            # Add a short sleep to avoid busy waiting
+            time.sleep(0.5)
 
-            # Step 6: Play the processed hana.wav file
-            play(hana_output_path)
+        # Reset flags to resume random_picker
+        print("Resuming random_picker...")
+        self.is_recording.clear()
+        self.pause_event.clear()
 
-        finally:
-            self.is_recording.clear()  # Clear the event when recording and processing is finished
+    def record_and_process_audio(self):
+        # 1. Record audio from the microphone
+        output_audio_path = self.resource_path('../Assets/Audio/user.wav')  # Adjust path as needed
+        print("Recording audio from microphone...")
+        record_audio(output_file=output_audio_path, mic_index=1, sample_rate=48000, chunk_size=1024, max_record_seconds=300)
 
-    def start_recording(self):
-        output_file = self.resource_path('../Assets/Audio/user.wav')
-        threading.Thread(target=self.record_and_process_audio, args=(output_file,)).start()
+        # 2. Transcribe the recorded audio using Whisper
+        print("Transcribing audio using Whisper...")
+        transcription = self.whisper_transcribe(output_audio_path)
+
+        # 3. Translate the transcription based on the active language switch
+        active_language = self.get_active_language()
+        print(f"Translating transcription to {active_language}...")
+        translated_text = translate(transcription, active_language)
+
+        # 4. Save the translated transcript to a .hana file
+        transcript_file_path = self.resource_path('../Data/Output/translated.hana')  # Adjust path as needed
+        try:
+            with open(transcript_file_path, 'w', encoding='utf-8') as hana_file:
+                hana_file.write(translated_text)
+            print(f"Translated transcript saved to {transcript_file_path}.")
+        except Exception as e:
+            print(f"Error saving transcript: {e}")
+
+        # 5. Use TTS to generate a response based on the translation
+        print("Generating audio response using TTS...")
+        tts_function = self.get_active_tts_function()
+        if tts_function:
+            ai_output_path = self.resource_path('../Assets/Audio/ai.wav')  # Adjust path as needed
+            try:
+                tts_function(translated_text, output_path=ai_output_path)
+                print(f"TTS audio saved to {ai_output_path}.")
+            except Exception as e:
+                print(f"Error generating TTS audio: {e}")
+                return  # Skip further processing if TTS fails
+
+            # 6. Process the audio using mainrvc and play the output
+            hana_output_path = self.resource_path('../Assets/Audio/hana.wav')  # Adjust path as needed
+            try:
+                print("Processing audio with mainrvc...")
+                mainrvc(ai_output_path, hana_output_path)
+                print(f"Processed audio saved to {hana_output_path}.")
+            except Exception as e:
+                print(f"Error processing audio with mainrvc: {e}")
+                return  # Skip playback if processing fails
+
+            try:
+                print("Playing processed audio...")
+                play(hana_output_path, self.selected_output_device_index)
+                print("Audio playback completed.")
+            except Exception as e:
+                print(f"Error playing audio: {e}")
+        else:
+            print("No TTS function is active. Cannot generate audio response.")
+
+        # Optional sleep or other logic
+        time.sleep(3)
+
+    def whisper_transcribe(self, audio_path):
+        # Use the loaded Whisper model to transcribe the audio file
+        try:
+            result = self.whisper_model.transcribe(audio_path)
+            transcription = result['text']
+            print(f"Transcription result: {transcription}")
+            return transcription
+        except Exception as e:
+            print(f"Error during transcription: {e}")
+            return ""
 
     def get_active_tts_function(self):
         for switch, tts_func in zip([self.switch_en, self.switch_es, self.switch_ru, self.switch_jp],
@@ -536,8 +623,6 @@ class App(ctk.CTk):
         if re.search(r':[^:\s]+:', text):
             return True
 
-        return False
-
         # Check for known text-based emotes
         for emote in self.known_emotes:
             if emote in text:
@@ -578,7 +663,7 @@ class App(ctk.CTk):
 
         while not self.stop_random_picker.is_set():  # Check if the stop event is set
             if self.is_recording.is_set():
-                # If recording is active, skip printing or any processing
+                # If recording is active, skip processing
                 print("Random picker is paused due to active recording.")
                 time.sleep(1)  # Small sleep to prevent busy-waiting
                 continue
@@ -599,7 +684,7 @@ class App(ctk.CTk):
 
             if self.pause_event.is_set():
                 print("Random picker is paused for Chloe AI processing.")
-                while self.pause_event.is_set():
+                while self.pause_event.is_set() and not self.stop_random_picker.is_set():
                     time.sleep(1)
 
             if self.cycle_active:
@@ -910,6 +995,36 @@ class App(ctk.CTk):
     def open_window2(self):
         self.hana_window = HWindow(self)  # Pass the reference of App to HWindow
         self.hana_window.mainloop()
+
+    def on_main_window_close(self):
+        # Example cleanup operations
+        print("Closing application...")
+        
+        # Stop any running threads or processes
+        if self.picker_thread and self.picker_thread.is_alive():
+            self.stop_random_picker.set()
+            self.picker_thread.join()
+        
+        if self.monitor_thread and self.monitor_thread.is_alive():
+            self.stop_monitor_file.set()
+            self.monitor_thread.join()
+        
+        if self.handler_thread and self.handler_thread.is_alive():
+            self.pause_event.set()
+            self.handler_thread.join()
+        
+        if self.draw_thread and self.draw_thread.is_alive():
+            self.draw_queue.put(None)  # Sentinel value to stop the thread
+            self.draw_thread.join()
+        
+        # Close any open windows
+        if self.hana_window:
+            self.hana_window.destroy()
+        if self.chloe_window:
+            self.chloe_window.destroy()
+        
+        # Finally, destroy the main window
+        self.destroy()
 
     def destroy(self):
         if self.after_id is not None:
