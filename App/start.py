@@ -14,7 +14,7 @@ class StartWindow(ctk.CTk):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
-        self.after_id = None
+        self.after_ids = []
 
         # Get the list of available microphones and output devices
         self.microphones = list_microphones()  # Now contains tuples of (name, index)
@@ -116,11 +116,16 @@ class StartWindow(ctk.CTk):
         # Pass the selected microphone and output device indexes, platform, and file to the App class
         app = App(selected_mic_index, selected_output_device_index, selected_platform, selected_llm)
         app.mainloop()
+
+        after_id = self.after(1000, self.some_callback)
+        self.after_ids.append(after_id)
+        self.process_log('    ("after" script)')
         
     def destroy(self):
-        # Cancel any pending callbacks before destroying the window
-        if self.after_id is not None:
-            self.after_cancel(self.after_id)
+        # Cancel all after callbacks before destroying the window
+        for after_id in self.after_ids:
+            self.after_cancel(after_id)
+        
         super().destroy()
 
     def resource_path(self, relative_path):
@@ -132,6 +137,17 @@ class StartWindow(ctk.CTk):
             # Otherwise, use the current directory
             base_path = os.path.abspath(".")
         return os.path.join(base_path, relative_path)
+    
+    def detect_and_delete_lines(self, message):
+        # Detect the specific message
+        if '    ("after" script)' in message:
+            # ANSI escape sequence to move the cursor up and clear lines
+            # Move cursor up by 1 and clear line for each of the last 4 lines
+            sys.stdout.write("\033[F\033[K" * 4)  # \033[F moves up a line, \033[K clears the line
+            sys.stdout.flush()
+
+    def process_log(self, message):
+        self.detect_and_delete_lines(message)
 
 if __name__ == "__main__":
     start_window = StartWindow()

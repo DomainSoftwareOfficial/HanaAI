@@ -48,9 +48,21 @@ class HWindow(ctk.CTk):
 def hana_ai(input_text, model=None):
     """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
 
-    def log_debug(message):
+    def log_debug(message, width=150):
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        print(f"{timestamp} | INFO | {message}")
+
+        # Prepare the log prefix (timestamp + INFO label)
+        prefix = f"{timestamp} | INFO | "
+        
+        # Calculate the available width for the message (subtract prefix length from total width)
+        available_width = width - len(prefix)
+
+        # If the message is too long, truncate it and add ...{hidden}
+        if len(message) > available_width:
+            message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
+
+        # Print the final log message with the prefix
+        print(f"{prefix}{message}")
 
     log_debug("Starting Hana AI processing...")
 

@@ -19,7 +19,6 @@ def load_model(model_path, n_ctx=32768, n_threads=8):
     try:
         # Load the LLaMA model
         llama_model = Llama(model_path=model_path, n_ctx=n_ctx, n_threads=n_threads)
-        print(f"Model loaded successfully from {model_path}")
         return llama_model
     except Exception as e:
         print(f"Error loading model: {e}")

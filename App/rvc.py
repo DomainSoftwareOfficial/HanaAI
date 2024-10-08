@@ -386,7 +386,6 @@ def rvc_convert(
         protect,
     )
     wavfile.write(output_file_path, tgt_sr, wav_opt)
-    print(f"\nFile finished writing to: {output_file_path}")
 
     return output_file_path
 

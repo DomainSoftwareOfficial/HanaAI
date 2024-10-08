@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import shlex  # Import shlex for quoting shell arguments
+from datetime import datetime
 
 class RAG:
     def __init__(self, params):
@@ -100,7 +101,24 @@ def mainrag(search_query):
     params_file = resource_path('../Data/Input/parameters.txt')
     rag = RAG(params_file)
     rag.generate_prompt(search_query)
-    print(f"Results have been written to {rag.params['output_file']}")
+    log_debug(f"Results have been written to {rag.params['output_file']}")
+
+def log_debug(message, width=150):
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Prepare the log prefix (timestamp + INFO label)
+    prefix = f"{timestamp} | INFO | "
+    
+    # Calculate the available width for the message (subtract prefix length from total width)
+    available_width = width - len(prefix)
+
+    # If the message is too long, truncate it and add ...{hidden}
+    if len(message) > available_width:
+        message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
+
+    # Print the final log message with the prefix
+    print(f"{prefix}{message}")
+
 
 if __name__ == "__main__":
     mainrag()

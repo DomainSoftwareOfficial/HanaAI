@@ -16,6 +16,7 @@ from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 import sounddevice as sd
 import soundfile as sf
+from datetime import datetime
 # Mapping for supported languages and models
 
 load_dotenv()
@@ -46,6 +47,9 @@ LANGUAGE_MODEL_MAP = {
     }
 }
 
+def log_debug(message):
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"{timestamp} | INFO | {message}")
 
 def tts_en(text, speed_up_factor=1.2, output_path='../Assets/Audio/ai.wav', gain_dB=5):
     """
@@ -246,7 +250,7 @@ def distort(speech_file_path, static_file_path, semitones=2, volume_reduction=0.
     
     # Export the resulting audio file
     combined.export(output_file_path, format="wav")
-    print(f"Processed audio exported to {output_file_path}")
+    log_debug(f"Processed audio exported to {output_file_path}")
 
 
 def list_microphones():
@@ -339,12 +343,12 @@ def ensure_models_downloaded():
         for target_lang, model_name in targets.items():
             model_dir = os.path.join(os.path.expanduser("~/.cache/huggingface/transformers"), model_name.replace("/", "_"))
             if not os.path.exists(model_dir):
-                print(f"Downloading model: {model_name}")
+                log_debug(f"Downloading model: {model_name}")
                 # Load model to trigger download
                 MarianMTModel.from_pretrained(model_name)
-                print(f"Model {model_name} downloaded successfully.")
+                log_debug(f"Model {model_name} downloaded successfully.")
             else:
-                print(f"Model {model_name} already exists.")
+                log_debug(f"Model {model_name} already exists.")
 
 
 def translate(text, target_lang):
@@ -354,17 +358,17 @@ def translate(text, target_lang):
 
         # Step 2: If the detected language is the same as the target language, return the original text
         if src_lang == target_lang:
-            print(f"Source language '{src_lang}' is the same as the target language. No translation needed.")
+            log_debug(f"Source language '{src_lang}' is the same as the target language. No translation needed.")
             return text
 
         # Step 3: Check if the detected language is supported in the LANGUAGE_MODEL_MAP
         if src_lang not in LANGUAGE_MODEL_MAP or target_lang not in LANGUAGE_MODEL_MAP.get(src_lang, {}):
-            print(f"Language pair '{src_lang}' to '{target_lang}' not supported. Assuming input is in English.")
+            log_debug(f"Language pair '{src_lang}' to '{target_lang}' not supported. Assuming input is in English.")
             src_lang = 'en'  # Default to English as the source language
 
         # Step 4: Check if there's a model for translation from English to the target language
         if target_lang not in LANGUAGE_MODEL_MAP.get(src_lang, {}):
-            print(f"Cannot find a translation model for '{src_lang}' to '{target_lang}'. Returning the original text.")
+            log_debug(f"Cannot find a translation model for '{src_lang}' to '{target_lang}'. Returning the original text.")
             return text
 
         # Step 5: Load the model and tokenizer for the detected language pair (or English to target language)
@@ -384,18 +388,17 @@ def translate(text, target_lang):
         return translated_text[0]
 
     except Exception as e:
-        print(f"Error: {e}")
+        log_debug(f"Error: {e}")
         return text
 
 
 def check_wav_properties(file_path):
     audio = AudioSegment.from_file(file_path)
-    print(f"Channels: {audio.channels}")
-    print(f"Sample width: {audio.sample_width}")
-    print(f"Frame rate (sample rate): {audio.frame_rate}")
-    print(f"Frame width: {audio.frame_width}")
-    print(f"Length (ms): {len(audio)}")
-
+    log_debug(f"Channels: {audio.channels}")
+    log_debug(f"Sample width: {audio.sample_width}")
+    log_debug(f"Frame rate (sample rate): {audio.frame_rate}")
+    log_debug(f"Frame width: {audio.frame_width}")
+    log_debug(f"Length (ms): {len(audio)}")
 
 
 def play(file_path, output_device_index=None):
@@ -412,7 +415,7 @@ def play(file_path, output_device_index=None):
     # Wait until the file has finished playing
     sd.wait()
     
-    print(f"Audio playback finished for {file_path}")
+    log_debug(f"Audio playback finished for {file_path}")
 
         
 if __name__ == "__main__":
