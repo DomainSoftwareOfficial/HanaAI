@@ -302,6 +302,8 @@ class App(ctk.CTk):
         open_window2_button = ctk.CTkButton(self, text="Open Hana Chatter", command=self.open_window2, corner_radius=0)
         open_window2_button.grid(row=6, column=1, padx=10, pady=10, sticky="ew")
 
+        self.monitor_processing = threading.Event()
+        self.mic_start_flag = threading.Event()
         self.stop_random_picker = threading.Event()
         self.stop_monitor_file = threading.Event()
         self.pause_event = threading.Event()
@@ -392,126 +394,114 @@ class App(ctk.CTk):
 
     def toggle_mic(self):
         self.fancy_log("🎤 Переключение микрофона", "toggle_mic вызван")
-        self.fancy_log("🎤 Состояние микрофона", f"Перед переключением: mic_on_active = {self.mic_on_active}")
+        self.fancy_log("🎤 Состояние микрофона", f"Активный: {self.is_recording.is_set()}")
 
-        if not self.mic_on_active:
-            # Activate Mic On
-            self.fancy_log("🎤 Микрофон", "Активация микрофона...")
-            self.mic_on_active = True
-            self.long_button.configure(text="Mic Off")
-            
-            # Pause random_picker and monitor_file
-            self.fancy_log("⏸️ Пауза", "Приостановка random_picker и monitor_file... ожидание их завершения.")
-            self.pause_event.set()  # Pause random_picker
-            self.stop_monitor_file.set()  # Pause monitor_file
-            
-            # Start mic processing in a separate thread
-            self.fancy_log("🎤 Микрофон", "Запуск обработки микрофона.")
-            self.mic_thread = threading.Thread(target=self.record, daemon=True)
+        if not self.is_recording.is_set():
+            # Pause random_picker and set the recording flag
+            self.pause_event.set()
+            self.is_recording.set()
+
+            # Start the recording loop in a new thread to avoid blocking the UI
+            self.mic_thread = threading.Thread(target=self.start_recording_loop, daemon=True)
             self.mic_thread.start()
-        
+
         else:
-            # Deactivate Mic On
-            self.fancy_log("🎤 Микрофон", "Деактивация микрофона...")
-            self.mic_on_active = False
-            self.long_button.configure(text="Mic On")
-            
-            # Signal to stop mic processing
-            self.stop_mic_processing = True
-            
-            # Resume random_picker and monitor_file
-            self.fancy_log("▶️ Возобновление", "Возобновление random_picker и monitor_file...")
-            self.pause_event.clear()  # Resume random_picker
-            self.stop_monitor_file.clear()  # Resume monitor_file
+            # Stop the recording
+            self.is_recording.clear()
+            self.stop_recording_loop()
 
-        self.fancy_log("🎤 Состояние микрофона", f"После переключения: mic_on_active = {self.mic_on_active}")
+            # Ensure the recording thread finishes before resuming random_picker
+            if self.mic_thread and self.mic_thread.is_alive():
+                self.mic_thread.join()  # Wait for the mic logic to complete
 
-    def record(self):
-        # Ensure that when Mic On is activated, random_picker is paused
-        self.fancy_log("🎤 Запись микрофона", "Приостановка random_picker для ввода с микрофона.")
-        self.is_recording.set()  # Signal that recording is active
-        self.pause_event.set()    # Pause random_picker
+            # Resume random_picker
+            self.pause_event.clear()
 
-        # Wait until random_picker acknowledges the pause
-        while not self.pause_event.is_set():
-            time.sleep(0.1)
+    def start_recording_loop(self):
+        self.fancy_log("🎤 Ожидание разрешения", "Ожидание начала записи с микрофона...")
 
-        # Wait until monitor_file is not active
-        if self.monitor_thread is not None and self.monitor_thread.is_alive():
-            self.fancy_log("⌛ Ожидание", "Ожидание завершения monitor_file...")
-            while self.monitor_thread.is_alive():
-                time.sleep(0.1)
+        # Run in a non-blocking loop to avoid freezing
+        while not self.mic_start_flag.is_set():
+            if not self.is_recording.is_set():
+                return  # Exit if recording is stopped
+            time.sleep(0.1)  # Small delay to avoid CPU overuse
 
-        # Start recording and processing
-        while self.mic_on_active and not self.stop_mic_processing:
-            self.fancy_log("🎤 Запись", "Запуск цикла записи и обработки...")
-            self.record_and_process_audio()  # This should be non-blocking
-            
-            # Add a short sleep to avoid busy waiting
-            time.sleep(0.5)
+        self.fancy_log("🎤 Разрешение получено", "Инициализация записи...")
+        self.record_and_process_audio()
 
-        # Reset flags to resume random_picker
-        self.fancy_log("▶️ Возобновление", "Возобновление random_picker...")
+    def stop_recording_loop(self):
+        self.fancy_log("🎤 Остановка записи", "Завершение записи...")
+
+        self.stop_mic_processing = True
         self.is_recording.clear()
-        self.pause_event.clear()
+
+        # Wait for mic thread to finish without blocking the UI
+        if self.mic_thread and self.mic_thread.is_alive():
+            self.fancy_log("⌛ Ожидание завершения", "Ожидание завершения потока...")
+            self.mic_thread.join(timeout=5)  # Timeout to avoid indefinite wait
 
     def record_and_process_audio(self):
-        # 1. Record audio from the microphone
-        output_audio_path = self.resource_path('../Assets/Audio/user.wav')  # Adjust path as needed
-        self.fancy_log("🎤 Запись аудио", "Запись аудио с микрофона...")
-        record_audio(output_file=output_audio_path, mic_index=1, sample_rate=48000, chunk_size=1024, max_record_seconds=300)
+        while self.is_recording.is_set():  # Keep recording as long as the mic is on
+            # 1. Record audio from the microphone
+            output_audio_path = self.resource_path('../Assets/Audio/user.wav')  # Adjust path as needed
+            self.fancy_log("🎤 Запись аудио", "Запись аудио с микрофона...")
+            record_audio(output_file=output_audio_path, mic_index=1, sample_rate=48000, chunk_size=1024, max_record_seconds=300)
 
-        # 2. Transcribe the recorded audio using Whisper
-        self.fancy_log("💬 Транскрибирование аудио", "Используя Whisper для транскрибирования аудио...")
-        transcription = self.whisper_transcribe(output_audio_path)
+            # 2. Transcribe the recorded audio using Whisper
+            self.fancy_log("💬 Транскрибирование аудио", "Используя Whisper для транскрибирования аудио...")
+            transcription = self.whisper_transcribe(output_audio_path)
 
-        # 3. Translate the transcription based on the active language switch
-        active_language = self.get_active_language()
-        self.fancy_log("🌍 Перевод транскрипции", f"Переводим транскрипцию на {active_language}...")
-        translated_text = translate(transcription, active_language)
+            # 3. Translate the transcription based on the active language switch
+            active_language = self.get_active_language()
+            self.fancy_log("🌍 Перевод транскрипции", f"Переводим транскрипцию на {active_language}...")
+            translated_text = translate(transcription, active_language)
 
-        # 4. Save the translated transcript to a .hana file
-        transcript_file_path = self.resource_path('../Data/Output/translated.hana')  # Adjust path as needed
-        try:
-            with open(transcript_file_path, 'w', encoding='utf-8') as hana_file:
-                hana_file.write(translated_text)
-            self.fancy_log("💾 Транскрипт сохранён", f"Переведённый транскрипт сохранён по адресу {transcript_file_path}.")
-        except Exception as e:
-            self.fancy_log("❌ Ошибка", f"Ошибка при сохранении транскрипта: {e}")
-
-        # 5. Use TTS to generate a response based on the translation
-        self.fancy_log("🗣️ Генерация аудио", "Генерируем аудиовыход с помощью TTS...")
-        tts_function = self.get_active_tts_function()
-        if tts_function:
-            ai_output_path = self.resource_path('../Assets/Audio/ai.wav')  # Adjust path as needed
+            # 4. Save the translated transcript to a .hana file
+            transcript_file_path = self.resource_path('../Data/Output/translated.hana')  # Adjust path as needed
             try:
-                tts_function(translated_text, output_path=ai_output_path)
-                self.fancy_log("🔊 Аудио TTS сохранено", f"Аудио TTS сохранено по адресу {ai_output_path}.")
+                with open(transcript_file_path, 'w', encoding='utf-8') as hana_file:
+                    hana_file.write(translated_text)
+                self.fancy_log("💾 Транскрипт сохранён", f"Переведённый транскрипт сохранён по адресу {transcript_file_path}.")
             except Exception as e:
-                self.fancy_log("❌ Ошибка", f"Ошибка при генерации TTS аудио: {e}")
-                return  # Skip further processing if TTS fails
+                self.fancy_log("❌ Ошибка", f"Ошибка при сохранении транскрипта: {e}")
 
-            # 6. Process the audio using mainrvc and play the output
-            hana_output_path = self.resource_path('../Assets/Audio/hana.wav')  # Adjust path as needed
-            try:
-                self.fancy_log("🎶 Обработка аудио", "Обработка аудио с помощью mainrvc...")
-                mainrvc(ai_output_path, hana_output_path)
-                self.fancy_log("💽 Обработанное аудио сохранено", f"Обработанное аудио сохранено по адресу {hana_output_path}.")
-            except Exception as e:
-                self.fancy_log("❌ Ошибка", f"Ошибка при обработке аудио с помощью mainrvc: {e}")
-                return  # Skip playback if processing fails
+            # 5. Use TTS to generate a response based on the translation
+            self.fancy_log("🗣️ Генерация аудио", "Генерируем аудиовыход с помощью TTS...")
+            tts_function = self.get_active_tts_function()
+            if tts_function:
+                ai_output_path = self.resource_path('../Assets/Audio/ai.wav')  # Adjust path as needed
+                try:
+                    tts_function(translated_text, output_path=ai_output_path)
+                    self.fancy_log("🔊 Аудио TTS сохранено", f"Аудио TTS сохранено по адресу {ai_output_path}.")
+                except Exception as e:
+                    self.fancy_log("❌ Ошибка", f"Ошибка при генерации TTS аудио: {e}")
+                    return  # Skip further processing if TTS fails
 
-            try:
-                self.fancy_log("▶️ Воспроизведение аудио", "Воспроизводим обработанное аудио...")
-                play(hana_output_path, self.selected_output_device_index)
-                self.fancy_log("✅ Воспроизведение завершено", "Воспроизведение аудио завершено.")
-            except Exception as e:
-                self.fancy_log("❌ Ошибка", f"Ошибка при воспроизведении аудио: {e}", width=100)
-        else:
-            self.fancy_log("❌ Ошибка", "Нет активной функции TTS. Невозможно сгенерировать аудиовыход.")
+                # 6. Process the audio using mainrvc and play the output
+                hana_output_path = self.resource_path('../Assets/Audio/hana.wav')  # Adjust path as needed
+                try:
+                    self.fancy_log("🎶 Обработка аудио", "Обработка аудио с помощью mainrvc...")
+                    mainrvc(ai_output_path, hana_output_path)
+                    self.fancy_log("💽 Обработанное аудио сохранено", f"Обработанное аудио сохранено по адресу {hana_output_path}.")
+                except Exception as e:
+                    self.fancy_log("❌ Ошибка", f"Ошибка при обработке аудио с помощью mainrvc: {e}")
+                    return  # Skip playback if processing fails
 
-        # Optional sleep or other logic
-        time.sleep(3)
+                try:
+                    self.fancy_log("▶️ Воспроизведение аудио", "Воспроизводим обработанное аудио...")
+                    play(hana_output_path, self.selected_output_device_index)
+                    self.fancy_log("✅ Воспроизведение завершено", "Воспроизведение аудио завершено.")
+                except Exception as e:
+                    self.fancy_log("❌ Ошибка", f"Ошибка при воспроизведении аудио: {e}", width=100)
+            else:
+                self.fancy_log("❌ Ошибка", "Нет активной функции TTS. Невозможно сгенерировать аудиовыход.")
+
+            # Optional sleep or other logic
+            time.sleep(3)
+
+            # Check if the recording is stopped to exit the loop
+            if not self.is_recording.is_set():
+                break
 
     def whisper_transcribe(self, audio_path):
         # Use the loaded Whisper model to transcribe the audio file
@@ -678,12 +668,20 @@ class App(ctk.CTk):
         last_formatted_string = None  # Initialize the variable
 
         while not self.stop_random_picker.is_set():  # Check if the stop event is set
-            if self.is_recording.is_set():
-                # If recording is active, skip processing
-                self.fancy_log("⏸️  ПРИОСТАНОВЛЕНО", "Случайный выбор приостановлен, так как идет запись.")
-                time.sleep(1)  # Small sleep to prevent busy-waiting
-                continue
+            if self.pause_event.is_set():
+                self.fancy_log("⏸️ Пауза", "random_picker приостановлен для записи с микрофона.")
 
+                # Set mic_start_flag to signal that recording can start
+                self.mic_start_flag.set()
+
+                # Wait until the pause_event is cleared before continuing
+                while self.pause_event.is_set():
+                    time.sleep(0.1)
+
+                # Clear the mic_start_flag when random_picker resumes
+                self.mic_start_flag.clear()
+                self.fancy_log("▶️ Возобновление", "random_picker возобновлен.")
+    
             # Check if superchat.chloe has content
             if os.path.exists(superchat_path):
                 with open(superchat_path, 'r', encoding='utf-8') as superchat_file:

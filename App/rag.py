@@ -101,8 +101,8 @@ def mainrag(search_query):
     params_file = resource_path('../Data/Input/parameters.txt')
     rag = RAG(params_file)
     rag.generate_prompt(search_query)
-    log_debug(f"Results have been written to {rag.params['output_file']}")
-
+    log_debug(f"Результаты были записаны в {rag.params['output_file']}")
+    
 def log_debug(message, width=150):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 

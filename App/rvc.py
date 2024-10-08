@@ -1,6 +1,7 @@
 import os, sys, pdb, torch
 import warnings
 import subprocess
+from datetime import datetime
 
 # Handle PyInstaller paths
 def resource_path(relative_path):
@@ -389,6 +390,22 @@ def rvc_convert(
 
     return output_file_path
 
+def log_debug(message, width=150):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Prepare the log prefix (timestamp + INFO label)
+        prefix = f"{timestamp} | INFO | "
+        
+        # Calculate the available width for the message (subtract prefix length from total width)
+        available_width = width - len(prefix)
+
+        # If the message is too long, truncate it and add ...{hidden}
+        if len(message) > available_width:
+            message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
+
+        # Print the final log message with the prefix
+        print(f"{prefix}{message}")
+
 
 def mainrvc(input, output_path):
 
@@ -396,7 +413,7 @@ def mainrvc(input, output_path):
     output_dir = os.path.dirname(output_path)
     output_file_name = os.path.basename(output_path)
 
-    print(f"{output_path}")  # Correctly referencing the passed argument
+    log_debug(f"{output_path}")  # Correctly referencing the passed argument
     # Need to comment out yaml setting for input audio
     rvc_convert(
         model_path=MODEL_INPUT,

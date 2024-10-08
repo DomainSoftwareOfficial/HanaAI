@@ -198,11 +198,11 @@ def chloe_ai(input_text, model=None):
         print(f"{prefix}{message}")
 
 
-    log_debug("Starting Chloe AI processing...")
+    log_debug("Запуск обработки Chloe AI...")
 
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
-    log_debug("Loaded environment variables.")
+    log_debug("Переменные окружения загружены.")
 
     chat_set = os.getenv('Instruction-Set')
 
@@ -210,7 +210,7 @@ def chloe_ai(input_text, model=None):
     instructions_path = resource_path("../Data/Input/profile.chloe")
     rag_path = resource_path("../Data/Input/results.txt")
 
-    log_debug(f"Reading input files: {instructions_path}, {rag_path}")
+    log_debug(f"Чтение файлов ввода: {instructions_path}, {rag_path}")
 
     # Ensure files are read with UTF-8 encoding
     with open(instructions_path, "r", encoding='utf-8') as file:
@@ -224,18 +224,18 @@ def chloe_ai(input_text, model=None):
     with open(rag_path, "r", encoding='utf-8') as file:
         rag = file.read()
 
-    log_debug("Input files successfully read.")
+    log_debug("Файлы успешно прочитаны.")
 
     if chat_set == 'Alpaca':
         prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{input_text}\n\n### Response:\nChloe Hayashi:"
     elif chat_set == 'ChatML':
         prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{input_text}<|im_end|>\n<|im_start|>assistant\nChloe Hayashi:"
 
-    log_debug(f"Generated prompt using {chat_set} instruction set.")
+    log_debug(f"Сгенерирована подсказка с использованием {chat_set} набора инструкций.")
 
     # Check if a model is provided, use it; otherwise, fallback to WebUI
     if model is not None:
-        log_debug("Local GGUF model is provided. Using the local model.")
+        log_debug("Предоставлена локальная модель GGUF. Использование локальной модели.")
         try:
             # Generate response using the local model
             start_time = time.time()
@@ -250,14 +250,14 @@ def chloe_ai(input_text, model=None):
 
             new_result = truncate_at_newline(new_result)
 
-            log_debug(f"Chloe said (via GGUF): {new_result} (Processed in {elapsed_time:.2f}s)")
+            log_debug(f"Chloe сказала (через GGUF): {new_result} (Обработано за {elapsed_time:.2f} с.)")
             return new_result
         except Exception as e:
-            log_debug(f"Error using GGUF model: {e}")
+            log_debug(f"Ошибка при использовании модели GGUF: {e}")
             return "Error using the local model. Please check the model setup."
     
     # If no local model is provided, fallback to WebUI
-    log_debug("No local model provided. Falling back to WebUI.")
+    log_debug("Локальная модель не предоставлена. Переход на WebUI.")
     try:
         url = f"{os.getenv('Text-Generation')}/v1/completions"
         headers = {"Content-Type": "application/json"}
@@ -285,13 +285,13 @@ def chloe_ai(input_text, model=None):
 
             new_result = truncate_at_newline(new_result)
 
-            log_debug(f"Chloe said (via WebUI): {new_result} (Processed in {elapsed_time:.2f}s)")
+            log_debug(f"Chloe сказала (через WebUI): {new_result} (Обработано за {elapsed_time:.2f} с.)")
             return new_result
         else:
-            log_debug(f"WebUI request failed with status code: {response.status_code}")
+            log_debug(f"Запрос к WebUI завершился с кодом: {response.status_code}")
             return "Failed to connect to WebUI."
     except Exception as e:
-        log_debug(f"Error connecting to WebUI: {e}")
+        log_debug(f"Ошибка подключения к WebUI: {e}")
         return "WebUI connection error."
 
 def generate_image(prompt):
