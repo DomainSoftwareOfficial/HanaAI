@@ -9,7 +9,7 @@ import requests
 import json
 import io
 import base64
-from PIL import Image, PngImagePlugin, ImageTk
+from PIL import Image, PngImagePlugin
 import uuid
 import threading
 import time
@@ -52,191 +52,202 @@ class CWindow(ctk.CTk):
             self.textbox.delete("1.0", tk.END)
             self.textbox.insert(tk.END, new_text)
 
-class AppWithInvisibleWindow(ctk.CTk):
+class ImageGenerator(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Initialize the list to keep track of all scheduled 'after' callbacks
+        # Инициализация списка для отслеживания всех запланированных обратных вызовов 'after'
         self.after_ids = []
 
-        # Configure the main window
-        self.title("Main App with Status and Button")
+        # Настройка основного окна
+        self.title("Image Control Panel")
         self.geometry("400x500")
-        ctk.set_appearance_mode("dark")  # Dark mode
-        ctk.set_default_color_theme("green")  # Green accent
+        ctk.set_appearance_mode("dark")  # Темный режим
+        ctk.set_default_color_theme("green")  # Зеленая тема
 
-        # Create a status bar (red initially)
+        # Создание строки состояния (изначально красной)
         self.status_bar = ctk.CTkLabel(self, text="Waiting for input", fg_color="red", height=30)
         self.status_bar.pack(side="top", fill="x", pady=(0, 10))
 
-        # Create an image display area in the main window
+        # Создание области отображения изображения в основном окне
         self.image_label = ctk.CTkLabel(self, text="No Image", width=200, height=200)
         self.image_label.pack(pady=10)
 
-        # Create a "Show Image" button (initially disabled)
+        # Создание кнопки "Show Image" (изначально отключена)
         self.button = ctk.CTkButton(self, text="Show Image", state="disabled", command=self.show_image)
         self.button.pack(pady=20)
 
-        # Initialize the invisible window
+        # Инициализация невидимого окна
         self.invisible_window = self.create_invisible_window()
 
-        # Initialize image tracking
+        # Инициализация отслеживания изображений
         self.latest_image = None
         self.displayed_images = set()
 
-        # Define the image folder to monitor
-        self.image_folder = self.resource_path("../Data/Images")  # Adjust the path as needed
-        os.makedirs(self.image_folder, exist_ok=True)  # Create the folder if it doesn't exist
+        # Определение папки для мониторинга изображений
+        self.image_folder = self.resource_path("../Assets/Images")  # Отрегулируйте путь при необходимости
+        os.makedirs(self.image_folder, exist_ok=True)  # Создать папку, если она не существует
 
-        # Start image generation in a separate thread
+        # Попытка использовать Resampling.LANCZOS для масштабирования
+        try:
+            self.resample_filter = Image.Resampling.LANCZOS
+        except AttributeError:
+            self.resample_filter = Image.LANCZOS  # Для Pillow < 10.0.0
+
+        # Запуск генерации изображений в отдельном потоке
         self.generate_image_async()
 
-        # Start monitoring the image folder for new images
+        # Запуск мониторинга папки изображений на новые файлы
         self.monitor_image_folder()
 
-        # Handle window close event
+        # Обработка события закрытия окна
         self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
     def create_invisible_window(self):
-        """Create an invisible window for displaying the image."""
+        """Создание невидимого окна для отображения изображения."""
         image_window = tk.Toplevel(self)
-        image_window.withdraw()  # Keep it hidden initially
+        image_window.withdraw()  # Скрыть окно изначально
         image_window.title("Generated Image")
         image_window.geometry("512x512")
-        image_window.overrideredirect(True)  # Remove window borders
-        image_window.attributes("-topmost", True)  # Always on top
+        image_window.overrideredirect(True)  # Удалить рамки окна
+        image_window.attributes("-topmost", True)  # Всегда поверх других окон
 
-        # Position the window at a specific location (e.g., top-right corner)
+        # Позиционирование окна в определенном месте (например, в правом верхнем углу)
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        x_position = int(screen_width * 7 / 8) + 256  # 7/8th of the screen width
-        y_position = int(screen_height / 2)     # Center vertically
+        x_position = int(screen_width * 7 / 8) + 256  # Отрегулировано для корректного позиционирования
+        y_position = int(screen_height / 2) # Центрирование по вертикали
         image_window.geometry(f"512x512+{x_position}+{y_position}")
 
-        # Create a label to display the image
-        image_label = tk.Label(image_window)
+        # Создание метки для отображения изображения
+        image_label = ctk.CTkLabel(image_window, width=512, height=512)
         image_label.pack()
 
         return (image_window, image_label)
 
     def generate_image_async(self):
-        """Start the image generation in a separate thread."""
+        """Запуск генерации изображений в отдельном потоке."""
         threading.Thread(target=self.generate_image_thread, daemon=True).start()
 
     def generate_image_thread(self):
-        """Call the provided `generate()` function to create an image."""
+        """Вызов функции `generate()` для создания изображения."""
         while True:
-            # Call the `generate()` function to create an image
-            image_path = generate_image('Kagamine Rin singing')
+            # Вызов функции `generate()` для создания изображения
+            image_path = generate_image('Studious Lad going to school.')  # Убедитесь, что эта функция определена
 
             if image_path and os.path.exists(image_path):
-                # Notify the main thread about the new image
+                # Уведомление главного потока о новом изображении
                 self.after(0, self.on_new_image_generated, image_path)
 
-            # Wait a few seconds before generating the next image
+            # Ожидание нескольких секунд перед генерацией следующего изображения
             time.sleep(5)
 
     def on_new_image_generated(self, image_path):
-        """Handle the newly generated image."""
+        """Обработка вновь сгенерированного изображения."""
         self.display_image_on_main_window(image_path)
 
     def monitor_image_folder(self):
-        """Monitor the image folder for new images."""
+        """Мониторинг папки изображений на наличие новых файлов."""
         try:
-            # List current images in the folder
+            # Список текущих изображений в папке
             current_images = set(os.listdir(self.image_folder))
-            # Identify new images that haven't been displayed yet
+            # Определение новых изображений, которые еще не были отображены
             new_images = current_images - self.displayed_images
 
             if new_images:
-                # Process each new image
+                # Обработка каждого нового изображения
                 for image_name in sorted(new_images):
                     image_path = os.path.join(self.image_folder, image_name)
                     self.display_image_on_main_window(image_path)
                     self.displayed_images.add(image_name)
         except Exception as e:
-            log_debug(f"Ошибка мониторинга папки изображений: {e}")
+            log_debug(f"Ошибка мониторинга папки изображений: {e}")  # Убедитесь, что log_debug определен
 
-        # Schedule the next check after 1 second
+        # Запланировать следующую проверку через 1 секунду
         self.safe_after(1000, self.monitor_image_folder)
 
     def display_image_on_main_window(self, image_path):
-        """Display the image on the main window and enable the button."""
+        """Отображение изображения в основном окне и включение кнопки."""
         try:
-            # Load and resize the image
+            # Загрузка и изменение размера изображения
             img = Image.open(image_path)
-            img = img.resize((512, 512))  # Adjust size as needed
-            self.image_obj = ImageTk.PhotoImage(img)
+            img = img.resize((341, 341), self.resample_filter)  # Использование Resampling.LANCZOS
 
-            # Update the image label in the main window
+            # Конвертация в CTkImage
+            self.image_obj = ctk.CTkImage(light_image=img, dark_image=img, size=(341, 341))
+
+            # Обновление метки изображения в основном окне
             self.image_label.configure(image=self.image_obj, text="")
 
-            # Update the status bar to indicate readiness
+            # Обновление строки состояния для индикации готовности
             self.status_bar.configure(text="Изображение готово", fg_color="green")
 
-            # Store the latest image path
+            # Сохранение пути к последнему изображению
             self.latest_image = image_path
 
-            # Enable the "Show Image" button
+            # Включение кнопки "Show Image"
             self.button.configure(state="normal")
         except Exception as e:
-            log_debug(f"Ошибка отображения изображения на главном окне: {e}")
+            log_debug(f"Ошибка отображения изображения на главном окне: {e}")  # Убедитесь, что log_debug определен
             self.status_bar.configure(text="Не удалось загрузить изображение", fg_color="red")
 
     def show_image(self):
-        """Display the latest image in the invisible window."""
+        """Отображение последнего изображения в невидимом окне."""
         if self.latest_image and os.path.exists(self.latest_image):
             try:
                 image_window, image_label = self.invisible_window
 
-                # Load and resize the image for the invisible window
+                # Загрузка изображения
                 img = Image.open(self.latest_image)
-                img = img.resize((512, 512))
-                self.image_obj_invisible = ImageTk.PhotoImage(img)
 
-                # Update the image label in the invisible window
-                image_label.config(image=self.image_obj_invisible)
+                # Изменение размера изображения для невидимого окна
+                img_resized = img.resize((341, 341), self.resample_filter)
+                # Конвертация в CTkImage
+                self.image_obj_invisible = ctk.CTkImage(light_image=img_resized, dark_image=img_resized, size=(341, 341))
 
-                # Show the invisible window
+                # Обновление метки изображения в невидимом окне
+                image_label.configure(image=self.image_obj_invisible, text='')
+
+                # Показать невидимое окно
                 image_window.deiconify()
 
-                # Optionally, hide the invisible window after 30 seconds
+                # Опционально, скрыть невидимое окно через 30 секунд
                 self.safe_after(30000, lambda: image_window.withdraw())
 
-                # Disable the button until a new image is generated
+                # Отключить кнопку до генерации нового изображения
                 self.button.configure(state="disabled")
 
-                # Update the status bar
+                # Обновление строки состояния
                 self.status_bar.configure(text="Изображение отображается", fg_color="blue")
 
             except Exception as e:
-                log_debug(f"Ошибка отображения изображения в невидимом окне: {e}")
+                log_debug(f"Ошибка отображения изображения в невидимом окне: {e}")  # Убедитесь, что log_debug определен
                 self.status_bar.configure(text="Не удалось отобразить изображение", fg_color="red")
         else:
-            log_debug("Нет доступного изображения или файл не найден.")
+            log_debug("Нет доступного изображения или файл не найден.")  # Убедитесь, что log_debug определен
             self.status_bar.configure(text="Нет изображения для отображения", fg_color="red")
 
     def on_main_window_close(self):
-        """Handle the closing of the main window."""
-        # Cancel all scheduled 'after' callbacks
+        """Обработка закрытия главного окна."""
+        # Отмена всех запланированных обратных вызовов 'after'
         for after_id in self.after_ids:
             try:
                 self.after_cancel(after_id)
             except Exception as e:
-                log_debug(f"Ошибка отмены обратного вызова {after_id}: {e}")
+                log_debug(f"Ошибка отмены обратного вызова {after_id}: {e}")  # Убедитесь, что log_debug определен
         self.after_ids.clear()
 
-        # Destroy the invisible window
+        # Уничтожение невидимого окна
         image_window, _ = self.invisible_window
         image_window.destroy()
 
-        # Destroy the main window
+        # Уничтожение главного окна
         self.destroy()
 
     def resource_path(self, relative_path):
-        """Get absolute path to resource, works for dev and for PyInstaller."""
+        """Получение абсолютного пути к ресурсу, работает как в разработке, так и при использовании PyInstaller."""
         try:
-            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            # PyInstaller создает временную папку и хранит путь в _MEIPASS
             base_path = sys._MEIPASS
         except Exception:
             base_path = os.path.abspath(".")
@@ -244,28 +255,35 @@ class AppWithInvisibleWindow(ctk.CTk):
 
     def safe_after(self, delay, func, *args, **kwargs):
         """
-        Schedule an after callback safely by wrapping it in a try-except block.
-        This prevents callbacks from being called on destroyed widgets.
+        Безопасное планирование обратного вызова 'after' с использованием try-except.
+        Это предотвращает вызов обратных вызовов на уничтоженных виджетах.
         """
         try:
             after_id = self.after(delay, lambda: self.safe_callback(func, *args, **kwargs))
-            self.after_ids.append(after_id)  # Keep track of the callback ID
+            self.after_ids.append(after_id)  # Отслеживание ID обратного вызова
         except Exception as e:
-            log_debug(f"Ошибка планирования обратного вызова после: {e}")
+            log_debug(f"Ошибка планирования обратного вызова после: {e}")  # Убедитесь, что log_debug определен
 
     def safe_callback(self, func, *args, **kwargs):
         """
-        Wrapper for callback functions to handle exceptions gracefully.
+        Обертка для функций обратного вызова для обработки исключений.
         """
         try:
             func(*args, **kwargs)
         except Exception as e:
-            log_debug(f"Ошибка в обратном вызове после: {e}")
+            log_debug(f"Ошибка в обратном вызове после: {e}")  # Убедитесь, что log_debug определен
 
 def chloe_ai(input_text, model=None):
     """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
 
     log_debug("Запуск обработки Chloe AI...")
+
+    try:
+        if isinstance(input_text, bytes):
+            input_text = input_text.decode('utf-8')  # Decoding bytes to string if needed
+    except UnicodeDecodeError as e:
+        log_debug(f"Error decoding input_text: {e}")
+        return "Error: Input text is not valid UTF-8."
 
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
@@ -463,5 +481,5 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 if __name__ == "__main__":
-    app = AppWithInvisibleWindow()
+    app = ImageGenerator()
     app.mainloop()

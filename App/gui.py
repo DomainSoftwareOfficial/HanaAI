@@ -108,7 +108,7 @@ class App(ctk.CTk):
         self.after_ids = []
         self.fancy_log("⚙️ ИНИЦИАЛИЗАЦИЯ", "Запуск Панели Управления...")
 
-        self.title("Control Panel")
+        self.title("Chat Control Panel")
         self.geometry("640x800")  # Increased height to accommodate the new layout
         ctk.set_appearance_mode("dark")  # Dark mode
         ctk.set_default_color_theme("green")  # Green accent

@@ -66,6 +66,13 @@ def hana_ai(input_text, model=None):
 
     log_debug("Запуск обработки Hana AI...")
 
+    try:
+        if isinstance(input_text, bytes):
+            input_text = input_text.decode('utf-8')  # Decoding bytes to string if needed
+    except UnicodeDecodeError as e:
+        log_debug(f"Error decoding input_text: {e}")
+        return "Error: Input text is not valid UTF-8."
+
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
     log_debug("Переменные окружения загружены.")
