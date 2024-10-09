@@ -104,7 +104,8 @@ class App(ctk.CTk):
     def __init__(self, microphone_index=None, output_device_index=None, selected_platform="None", selected_llm=None):
         super().__init__()
 
-        self.process_log('    ("after" script)')
+        self.clear_last_lines()
+        self.after_ids = []
         self.fancy_log("⚙️ ИНИЦИАЛИЗАЦИЯ", "Запуск Панели Управления...")
 
         self.title("Control Panel")
@@ -186,7 +187,7 @@ class App(ctk.CTk):
 
         # Variables to manage the timing and last printed text
         self.last_printed_text = ""
-        self.after_id = None
+        self.after_id = None  # This will store the ID of the scheduled after callback
 
         # Bind the search entry's key release event to handle input changes
         self.search_entry.bind("<KeyRelease>", self.on_search_change)
@@ -312,6 +313,26 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
         self.fancy_log("⚙️ ИНИЦИАЛИЗАЦИЯ", "Панель управления полностью инициализирована.")
+
+    def safe_after(self, delay, func, *args, **kwargs):
+        """
+        Schedule an after callback safely by wrapping it in a try-except block.
+        This prevents callbacks from being called on destroyed widgets.
+        """
+        try:
+            after_id = self.after(delay, lambda: self.safe_callback(func, *args, **kwargs))
+            self.after_ids.append(after_id)  # Keep track of the callback ID
+        except Exception as e:
+            print(f"Error scheduling after callback: {e}")
+
+    def safe_callback(self, func, *args, **kwargs):
+        """
+        Wrapper for callback functions to handle exceptions gracefully.
+        """
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            print(f"Error in after callback: {e}")
 
     def on_search_change(self, event):
         # Cancel any existing scheduled print function
@@ -1048,17 +1069,14 @@ class App(ctk.CTk):
         print("=" * (width - 1) + "=")
         print()  # Print a new line after the log entry
 
-    def detect_and_delete_lines(self, message):
-        # Detect the specific message
-        if '    ("after" script)' in message:
-            # ANSI escape sequence to move the cursor up and clear lines
-            # Move cursor up by 1 and clear line for each of the last 4 lines
-            sys.stdout.write("\033[F\033[K" * 4)  # \033[F moves up a line, \033[K clears the line
-            sys.stdout.flush()
-
-    def process_log(self, message):
-        self.detect_and_delete_lines(message)
-
+    def clear_last_lines(self, n=4):
+        # ANSI escape sequence for moving the cursor up and clearing the line
+        # \033[A moves the cursor up
+        # \033[K clears the line
+        for _ in range(n):
+            sys.stdout.write('\033[A')  # Move cursor up one line
+            sys.stdout.write('\033[K')  # Clear the line
+        sys.stdout.flush()
 
     def open_window1(self):
         self.chloe_window = CWindow()
@@ -1069,33 +1087,20 @@ class App(ctk.CTk):
         self.hana_window.mainloop()
 
     def on_main_window_close(self):
-        # Example cleanup operations
-        print("Closing application...")
-        
-        # Stop any running threads or processes
-        if self.picker_thread and self.picker_thread.is_alive():
-            self.stop_random_picker.set()
-            self.picker_thread.join()
-        
-        if self.monitor_thread and self.monitor_thread.is_alive():
-            self.stop_monitor_file.set()
-            self.monitor_thread.join()
-        
-        if self.handler_thread and self.handler_thread.is_alive():
-            self.pause_event.set()
-            self.handler_thread.join()
-        
-        if self.draw_thread and self.draw_thread.is_alive():
-            self.draw_queue.put(None)  # Sentinel value to stop the thread
-            self.draw_thread.join()
-        
-        # Close any open windows
-        if self.hana_window:
-            self.hana_window.destroy()
-        if self.chloe_window:
-            self.chloe_window.destroy()
-        
-        # Finally, destroy the main window
+        """Cancel all after callbacks and gracefully close the window."""
+        # Cancel all scheduled after callbacks
+        for after_id in self.after_ids:
+            try:
+                self.after_cancel(after_id)
+            except Exception as e:
+                print(f"Error canceling after callback {after_id}: {e}")
+        self.after_ids.clear()  # Clear the list after canceling
+
+        # Perform other cleanup operations as needed
+        self.stop_random_picker.set()  # Stop picker if running
+        self.monitor_processing.set()  # Stop any monitoring
+
+        # Finally, destroy the window
         self.destroy()
 
     def destroy(self):

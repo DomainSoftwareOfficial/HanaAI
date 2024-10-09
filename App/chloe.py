@@ -52,13 +52,16 @@ class CWindow(ctk.CTk):
             self.textbox.delete("1.0", tk.END)
             self.textbox.insert(tk.END, new_text)
 
-
-class MainApp(ctk.CTk):
+class AppWithInvisibleWindow(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        # Initialize the list to keep track of all scheduled 'after' callbacks
+        self.after_ids = []
+
+        # Configure the main window
         self.title("Main App with Status and Button")
-        self.geometry("300x200")
+        self.geometry("400x500")
         ctk.set_appearance_mode("dark")  # Dark mode
         ctk.set_default_color_theme("green")  # Green accent
 
@@ -66,137 +69,201 @@ class MainApp(ctk.CTk):
         self.status_bar = ctk.CTkLabel(self, text="Waiting for input", fg_color="red", height=30)
         self.status_bar.pack(side="top", fill="x", pady=(0, 10))
 
-        # Create a rectangular button (initially disabled)
+        # Create an image display area in the main window
+        self.image_label = ctk.CTkLabel(self, text="No Image", width=200, height=200)
+        self.image_label.pack(pady=10)
+
+        # Create a "Show Image" button (initially disabled)
         self.button = ctk.CTkButton(self, text="Show Image", state="disabled", command=self.show_image)
         self.button.pack(pady=20)
 
-        # Create an invisible window for showing the image
-        self.invisible_window = InvisibleWindow() # Ensure this is correctly creating the window object
+        # Initialize the invisible window
+        self.invisible_window = self.create_invisible_window()
 
-        # Image path (initially None)
+        # Initialize image tracking
         self.latest_image = None
+        self.displayed_images = set()
+
+        # Define the image folder to monitor
+        self.image_folder = self.resource_path("../Data/Images")  # Adjust the path as needed
+        os.makedirs(self.image_folder, exist_ok=True)  # Create the folder if it doesn't exist
 
         # Start image generation in a separate thread
         self.generate_image_async()
 
-    def generate_image_async(self):
-        # Run the image generation in a separate thread
-        threading.Thread(target=self.generate_image_thread).start()
+        # Start monitoring the image folder for new images
+        self.monitor_image_folder()
 
-    def generate_image_thread(self):
-        # Generate the image
-        image_path = generate_image("Studious Lad going to school")
-        
-        self.after(0, self.update_image, image_path)
-        print(image_path)
+        # Handle window close event
+        self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
-    def update_image(self, image_path):
-        self.latest_image = image_path
+    def create_invisible_window(self):
+        """Create an invisible window for displaying the image."""
+        image_window = tk.Toplevel(self)
+        image_window.withdraw()  # Keep it hidden initially
+        image_window.title("Generated Image")
+        image_window.geometry("512x512")
+        image_window.overrideredirect(True)  # Remove window borders
+        image_window.attributes("-topmost", True)  # Always on top
 
-        if self.latest_image:
-            # Update the status bar to green and enable the button
-            self.status_bar.configure(text="Image Ready", fg_color="green")
-            self.button.configure(state="normal")  # Enable the button
-
-            # Update the invisible window with the latest image
-            self.invisible_window.update_latest_image(self.latest_image)
-        else:
-            print("Failed to generate an image.")
-            self.status_bar.configure(text="Image generation failed", fg_color="red")
-
-    def show_image(self):
-        # Disable the button while the image is shown
-        self.button.configure(state="disabled")
-
-        # Trigger the invisible window to show the image
-        self.invisible_window.display_latest_image()
-
-        # Reset the status bar and button after image is shown
-        self.after(30000, self.reset_after_image_display)  # Wait for 30 seconds
-
-    def reset_after_image_display(self):
-        self.status_bar.configure(text="Waiting for input", fg_color="red")
-        self.button.configure(state="normal")  # Enable the button for new inputs
-
-class InvisibleWindow(ctk.CTk):
-    def __init__(self):
-        super().__init__()  # Initialize the CTk window
-
-        # Correctly create the Toplevel window (this might be where the issue is)
-        self.withdraw()  # Make the main window invisible
-        self.latest_image = None
-
-        # Set up the image window
-        self.setup_image_window()
-
-    def setup_image_window(self):
-        # Create a new Toplevel window
-        self.image_window = tk.Toplevel(self)  # Link it to the current invisible window
-        self.image_window.withdraw()  # Keep it hidden initially
-        self.image_window.title("Generated Image")
-        self.image_window.geometry("512x512")
-
-        # Make the window borderless and always on top
-        self.image_window.overrideredirect(True)
-        self.image_window.attributes("-topmost", True)
-
-        # Position the window (ensure this calculation is correct)
+        # Position the window at a specific location (e.g., top-right corner)
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        x_position = int(screen_width * 7 / 8) + 256
-        y_position = int(screen_height / 2)
-        self.image_window.geometry(f"512x512+{x_position}+{y_position}")
+        x_position = int(screen_width * 7 / 8) + 256  # 7/8th of the screen width
+        y_position = int(screen_height / 2)     # Center vertically
+        image_window.geometry(f"512x512+{x_position}+{y_position}")
 
-        # Create a label in the image window to show the image
-        self.image_label = tk.Label(self.image_window)
-        self.image_label.pack()
+        # Create a label to display the image
+        image_label = tk.Label(image_window)
+        image_label.pack()
 
-    def update_latest_image(self, image_path):
-        self.latest_image = image_path
+        return (image_window, image_label)
 
-    def display_latest_image(self):
+    def generate_image_async(self):
+        """Start the image generation in a separate thread."""
+        threading.Thread(target=self.generate_image_thread, daemon=True).start()
+
+    def generate_image_thread(self):
+        """Call the provided `generate()` function to create an image."""
+        while True:
+            # Call the `generate()` function to create an image
+            image_path = generate_image('Kagamine Rin singing')
+
+            if image_path and os.path.exists(image_path):
+                # Notify the main thread about the new image
+                self.after(0, self.on_new_image_generated, image_path)
+
+            # Wait a few seconds before generating the next image
+            time.sleep(5)
+
+    def on_new_image_generated(self, image_path):
+        """Handle the newly generated image."""
+        self.display_image_on_main_window(image_path)
+
+    def monitor_image_folder(self):
+        """Monitor the image folder for new images."""
+        try:
+            # List current images in the folder
+            current_images = set(os.listdir(self.image_folder))
+            # Identify new images that haven't been displayed yet
+            new_images = current_images - self.displayed_images
+
+            if new_images:
+                # Process each new image
+                for image_name in sorted(new_images):
+                    image_path = os.path.join(self.image_folder, image_name)
+                    self.display_image_on_main_window(image_path)
+                    self.displayed_images.add(image_name)
+        except Exception as e:
+            log_debug(f"Ошибка мониторинга папки изображений: {e}")
+
+        # Schedule the next check after 1 second
+        self.safe_after(1000, self.monitor_image_folder)
+
+    def display_image_on_main_window(self, image_path):
+        """Display the image on the main window and enable the button."""
+        try:
+            # Load and resize the image
+            img = Image.open(image_path)
+            img = img.resize((512, 512))  # Adjust size as needed
+            self.image_obj = ImageTk.PhotoImage(img)
+
+            # Update the image label in the main window
+            self.image_label.configure(image=self.image_obj, text="")
+
+            # Update the status bar to indicate readiness
+            self.status_bar.configure(text="Изображение готово", fg_color="green")
+
+            # Store the latest image path
+            self.latest_image = image_path
+
+            # Enable the "Show Image" button
+            self.button.configure(state="normal")
+        except Exception as e:
+            log_debug(f"Ошибка отображения изображения на главном окне: {e}")
+            self.status_bar.configure(text="Не удалось загрузить изображение", fg_color="red")
+
+    def show_image(self):
+        """Display the latest image in the invisible window."""
         if self.latest_image and os.path.exists(self.latest_image):
             try:
-                # Load the image
+                image_window, image_label = self.invisible_window
+
+                # Load and resize the image for the invisible window
                 img = Image.open(self.latest_image)
                 img = img.resize((512, 512))
+                self.image_obj_invisible = ImageTk.PhotoImage(img)
 
-                # Create a persistent reference to the image
-                self.image_obj = ImageTk.PhotoImage(img)
+                # Update the image label in the invisible window
+                image_label.config(image=self.image_obj_invisible)
 
-                # Update the label with the image
-                self.image_label.config(image=self.image_obj)
+                # Show the invisible window
+                image_window.deiconify()
 
-                # Show the image window
-                self.image_window.deiconify()
+                # Optionally, hide the invisible window after 30 seconds
+                self.safe_after(30000, lambda: image_window.withdraw())
 
-                # Hide the window after 30 seconds
-                self.after(30000, self.image_window.withdraw)
+                # Disable the button until a new image is generated
+                self.button.configure(state="disabled")
+
+                # Update the status bar
+                self.status_bar.configure(text="Изображение отображается", fg_color="blue")
 
             except Exception as e:
-                print(f"Error loading image: {e}")
+                log_debug(f"Ошибка отображения изображения в невидимом окне: {e}")
+                self.status_bar.configure(text="Не удалось отобразить изображение", fg_color="red")
         else:
-            print("No image available or file not found.")
-            
+            log_debug("Нет доступного изображения или файл не найден.")
+            self.status_bar.configure(text="Нет изображения для отображения", fg_color="red")
+
+    def on_main_window_close(self):
+        """Handle the closing of the main window."""
+        # Cancel all scheduled 'after' callbacks
+        for after_id in self.after_ids:
+            try:
+                self.after_cancel(after_id)
+            except Exception as e:
+                log_debug(f"Ошибка отмены обратного вызова {after_id}: {e}")
+        self.after_ids.clear()
+
+        # Destroy the invisible window
+        image_window, _ = self.invisible_window
+        image_window.destroy()
+
+        # Destroy the main window
+        self.destroy()
+
+    def resource_path(self, relative_path):
+        """Get absolute path to resource, works for dev and for PyInstaller."""
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
+
+    def safe_after(self, delay, func, *args, **kwargs):
+        """
+        Schedule an after callback safely by wrapping it in a try-except block.
+        This prevents callbacks from being called on destroyed widgets.
+        """
+        try:
+            after_id = self.after(delay, lambda: self.safe_callback(func, *args, **kwargs))
+            self.after_ids.append(after_id)  # Keep track of the callback ID
+        except Exception as e:
+            log_debug(f"Ошибка планирования обратного вызова после: {e}")
+
+    def safe_callback(self, func, *args, **kwargs):
+        """
+        Wrapper for callback functions to handle exceptions gracefully.
+        """
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            log_debug(f"Ошибка в обратном вызове после: {e}")
+
 def chloe_ai(input_text, model=None):
     """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
-
-    def log_debug(message, width=150):
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-        # Prepare the log prefix (timestamp + INFO label)
-        prefix = f"{timestamp} | INFO | "
-        
-        # Calculate the available width for the message (subtract prefix length from total width)
-        available_width = width - len(prefix)
-
-        # If the message is too long, truncate it and add ...{hidden}
-        if len(message) > available_width:
-            message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
-
-        # Print the final log message with the prefix
-        print(f"{prefix}{message}")
-
 
     log_debug("Запуск обработки Chloe AI...")
 
@@ -339,17 +406,34 @@ def generate_image(prompt):
                     pnginfo.add_text("parameters", response2.json().get("info"))
                     # Save the image with the random filename
                     image.save(random_filename, pnginfo=pnginfo)
-                print(f"Image saved as {random_filename}")
+                log_debug(f"Изображение сохранено как {random_filename}")
                 return random_filename  # Return the saved image path
             else:
-                print("'images' key not found in the JSON response.")
+                log_debug("'images' ключ не найден в JSON ответе.")
                 return None
         except json.JSONDecodeError:
-            print("Error decoding JSON response.")
+            log_debug("Ошибка при декодировании JSON ответа.")
             return None
     else:
-        print(f"Error: {response.status_code} - {response.text}")
+        log_debug(f"Ошибка: {response.status_code} - {response.text}")
         return None
+
+
+def log_debug(message, width=150):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Prepare the log prefix (timestamp + INFO label)
+        prefix = f"{timestamp} | INFO | "
+        
+        # Calculate the available width for the message (subtract prefix length from total width)
+        available_width = width - len(prefix)
+
+        # If the message is too long, truncate it and add ...{hidden}
+        if len(message) > available_width:
+            message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
+
+        # Print the final log message with the prefix
+        print(f"{prefix}{message}")
 
 def truncate_at_newline(text):
     """Truncate the text right before it encounters any newline sequences (<0x0A><0x0A> or <0x0A> in the output)."""
@@ -379,8 +463,5 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 if __name__ == "__main__":
-    # Initialize and start the main app
-    app = MainApp()
-
-    # Start the app loop
+    app = AppWithInvisibleWindow()
     app.mainloop()
