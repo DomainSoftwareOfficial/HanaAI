@@ -64,14 +64,11 @@ def hana_ai(input_text, model=None):
         # Print the final log message with the prefix
         print(f"{prefix}{message}")
 
-    log_debug("Запуск обработки Hana AI...")
+    def remove_invalid_bytes(data):
+        """Remove byte sequences represented as <0x..>."""
+        return re.sub(r'<0x[0-9A-Fa-f]{1,2}>', '', data)
 
-    try:
-        if isinstance(input_text, bytes):
-            input_text = input_text.decode('utf-8')  # Decoding bytes to string if needed
-    except UnicodeDecodeError as e:
-        log_debug(f"Error decoding input_text: {e}")
-        return "Error: Input text is not valid UTF-8."
+    log_debug("Запуск обработки Hana AI...")
 
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
@@ -125,6 +122,8 @@ def hana_ai(input_text, model=None):
             new_result = emoji.replace_emoji(new_result, replace='')  # Remove emojis
 
             new_result = truncate_at_newline(new_result)
+            
+            new_result = remove_invalid_bytes(new_result)
 
             log_debug(f"Ответ модели: {new_result} (Обработано за {elapsed_time:.2f} с.)")
 
@@ -161,6 +160,8 @@ def hana_ai(input_text, model=None):
             new_result = emoji.replace_emoji(new_result, replace='')
 
             new_result = truncate_at_newline(new_result)
+
+            new_result = remove_invalid_bytes(new_result)
 
             log_debug(f"Ответ WebUI: {new_result} (Обработано за {elapsed_time:.2f} с.)")
 

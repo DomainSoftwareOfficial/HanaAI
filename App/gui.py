@@ -10,7 +10,6 @@ import emoji
 import shutil
 import queue
 import re
-import textwrap
 import unicodedata
 from datetime import datetime
 from dotenv import load_dotenv
@@ -65,28 +64,28 @@ class TextBoxFrame(ctk.CTkFrame):
                 # Create the directory if it doesn't exist
                 os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
                 # Create an empty file
-                with open(self.file_path, 'w') as file:
+                with open(self.file_path, 'w', encoding='utf-8') as file:
                     file.write("")
         except Exception as e:
-            print(f"Error saving content: {e}")
+            self.log_debug(f"Ошибка при сохранении содержимого: {e}")
 
     def load_content(self):
         try:
-            with open(self.file_path, 'r') as file:
+            with open(self.file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
             self.textbox.delete("1.0", ctk.END)
             self.textbox.insert(ctk.END, content)
             self.textbox.see(ctk.END)  # Ensure the content is visible
         except Exception as e:
-            print(f"Error saving content: {e}")
+            self.log_debug(f"Ошибка при сохранении содержимого: {e}")
 
     def save_content(self, event=None):
         try:
             content = self.textbox.get("1.0", ctk.END).strip()  # Strip trailing newlines
-            with open(self.file_path, 'w') as file:
+            with open(self.file_path, 'w', encoding='utf-8') as file:
                 file.write(content)
         except Exception as e:
-            print(f"Error saving content: {e}")
+            self.log_debug(f"Ошибка при сохранении содержимого: {e}")
 
     def monitor_file(self):
         last_modified = os.path.getmtime(self.file_path)
@@ -98,7 +97,23 @@ class TextBoxFrame(ctk.CTkFrame):
                     last_modified = current_modified
                     self.load_content()
             except Exception as e:
-                print(f"Error saving content: {e}")
+                self.log_debug(f"Ошибка при сохранении содержимого: {e}")
+
+    def log_debug(self, message, width=150):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Prepare the log prefix (timestamp + INFO label)
+        prefix = f"{timestamp} | INFO | "
+        
+        # Calculate the available width for the message (subtract prefix length from total width)
+        available_width = width - len(prefix)
+
+        # If the message is too long, truncate it and add ...{hidden}
+        if len(message) > available_width:
+            message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
+
+        # Print the final log message with the prefix
+        print(f"{prefix}{message}")
 
 class App(ctk.CTk):
     def __init__(self, microphone_index=None, output_device_index=None, selected_platform="None", selected_llm=None):
