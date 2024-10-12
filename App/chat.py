@@ -28,17 +28,11 @@ class YouTubeChatHandler:
             self.resource_path('../Data/Chat/General/viewer2.hana'),
             self.resource_path('../Data/Chat/General/viewer3.hana')
         ]
-        self.draw_request_file = self.resource_path('../Data/Chat/Special/request.chloe')
         self._stop_event = threading.Event()
 
     def handle_chat(self, item):
         message = item.message
         username = item.author.name
-
-        # Check for draw request
-        if message.startswith("!draw"):
-            draw_message = message[len("!draw"):].strip()  # Remove "!draw" from the message
-            self.save_to_file(self.draw_request_file, draw_message)
 
         # Check for super chat
         if item.type == 'superChat':
@@ -102,7 +96,6 @@ class TwitchChatHandler(twitch_commands.Bot):
             self.resource_path('../Data/Chat/General/viewer2.hana'),
             self.resource_path('../Data/Chat/General/viewer3.hana')
         ]
-        self.draw_request_file = self.resource_path('../Data/Chat/Special/request.chloe')
         self._stop_event = threading.Event()
 
     async def event_message(self, message):
@@ -113,11 +106,6 @@ class TwitchChatHandler(twitch_commands.Bot):
     async def handle_chat(self, message):
         username = message.author.name
         content = message.content
-
-        # Check for draw request
-        if content.startswith("!draw"):
-            draw_message = content[len("!draw"):].strip()  # Remove "!draw" from the message
-            self.save_to_file(self.draw_request_file, draw_message)
 
         # Check for special messages (like Super Chat)
         if message.tags.get('badges') and 'broadcaster' in message.tags.get('badges'):

@@ -17,7 +17,7 @@ from chloe import CWindow
 from hana import HWindow
 from hana import hana_ai
 from chloe import chloe_ai
-from chloe import generate_image
+from chloe import ImageGenerator
 from chat import YouTubeChatHandler
 from chat import TwitchChatHandler
 from audio import translate
@@ -131,6 +131,8 @@ class App(ctk.CTk):
         self.selected_mic_index = microphone_index
         self.selected_platform = selected_platform
         self.selected_output_device_index = output_device_index
+
+        self.image_generator = ImageGenerator(self)
 
         self.fancy_log("🔊 НАСТРОЙКИ ЗВУКА", f"Воспроизведение звука на устройстве с индексом: {self.selected_output_device_index}")
         self.fancy_log("🌐 НАСТРОЙКИ ПЛАТФОРМЫ", f"Используемые сервисы: {self.selected_platform}")
@@ -1020,7 +1022,8 @@ class App(ctk.CTk):
                 input_text = input_text.replace("!draw", "").strip()
 
                 # Call the imported function with the stripped input
-                generate_image(input_text)  # Assuming imported_function is defined elsewhere
+                trigger_thread = threading.Thread(target=self.image_generator.generate_image_thread, args=(input_text), daemon=True)
+                trigger_thread.start()
 
                 self.draw_queue.task_done()  # Mark the task as done
                 self.fancy_log("✅ ЗАВЕРШЕНО", f"Завершена обработка команды рисования: {input_text}")
