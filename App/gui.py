@@ -156,23 +156,44 @@ class App(ctk.CTk):
         self.hana_window_active = False
         self.mic_on_active = False  # Initialize the attribute
         self.stop_mic_processing = False  # Flag to stop mic processing
-
+        self.last_spin_time = 0      # Initialize the last spin command time
+        self.last_headpat_time = 0   # Initialize the last headpat command time
 
         self.known_emotes = []
 
         # Resolve the base path for PyInstaller
         self.base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 
+        self.spin_file = self.resource_path('../Data/Output/spin.txt')
+        self.headpat_file = self.resource_path('../Data/Output/spin.txt')
         superchat_path = self.resource_path('../Data/Chat/Special/superchat.chloe')
         superviewer_path = self.resource_path('../Data/Chat/Special/superviewer.chloe')
 
-        with open(superchat_path, 'w', encoding='utf-8') as superchat_file:
-            superchat_file.write('')  # Empty the file content after use
+        # Clear superchat.chloe file
+        try:
+            with open(superchat_path, 'w', encoding='utf-8') as superchat_file:
+                superchat_file.write('')  # Empty the file content
+            self.fancy_log("📂 ОЧИСТКА ФАЙЛА", f"Файл {superchat_path} успешно очищен.")
+        except Exception as e:
+            self.fancy_log("❌ ОШИБКА", f"Не удалось очистить файл {superchat_path}: {e}")
 
-        with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
-                superviewer_file.write('')  # Empty the file content after use
+        # Clear superviewer.chloe file
+        try:
+            with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
+                superviewer_file.write('')  # Empty the file content
+            self.fancy_log("📂 ОЧИСТКА ФАЙЛА", f"Файл {superviewer_path} успешно очищен.")
+        except Exception as e:
+            self.fancy_log("❌ ОШИБКА", f"Не удалось очистить файл {superviewer_path}: {e}")
 
-        self.fancy_log("📂 ИНИЦИАЛИЗАЦИЯ ФАЙЛОВ", "Файлы Superchat и Superviewer очищены.")
+        memory_file_path = self.resource_path('../Data/Input/memory.txt')
+
+        # Clear memory.txt file
+        try:
+            with open(memory_file_path, 'w', encoding='utf-8') as memory_file:
+                memory_file.write('')  # Empty the file content
+            self.fancy_log("📂 ОЧИСТКА ФАЙЛА", f"Файл {memory_file_path} успешно очищен.")
+        except Exception as e:
+            self.fancy_log("❌ ОШИБКА", f"Не удалось очистить файл {memory_file_path}: {e}")
 
         # Initialize LLM model to None
         self.llm_model = None
@@ -220,6 +241,15 @@ class App(ctk.CTk):
             self.resource_path('../Data/Chat/General/viewer3.hana'),
             self.resource_path('../Data/Chat/General/input3.hana')
         ]
+
+        # Clear chat txt files
+        for file_path in files:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as file:
+                    file.write('')  # Empty the file content
+                self.fancy_log("📂 ОЧИСТКА ФАЙЛА", f"Файл {file_path} успешно очищен.")
+            except Exception as e:
+                self.fancy_log("❌ ОШИБКА", f"Не удалось очистить файл {file_path}: {e}")
 
         # Create text boxes in two columns
         self.columnconfigure(0, weight=1)
@@ -990,6 +1020,37 @@ class App(ctk.CTk):
                 self.handle_draw_command(command)
             else:
                 self.fancy_log("🎨 РЕЖИМ ИСКУССТВА", "Art-On отключен, игнорирование команды !draw.")
+
+        if command.startswith('!spin'):
+            current_time = time.time()  # Get the current time in seconds
+            time_since_last_spin = current_time - self.last_spin_time
+
+            if time_since_last_spin >= 300:  # Check if 5 minutes (300 seconds) have passed
+                # Create spin.txt file
+                with open(self.spin_file, 'w', encoding='utf-8') as f:
+                    f.write('This is the spin.txt file.')
+                self.last_spin_time = current_time  # Update the last spin command time
+                self.fancy_log("🔄 ВРАЩЕНИЕ", "Создан файл spin.txt")
+            else:
+                # Ignore command and log the cooldown message
+                remaining_time = 300 - time_since_last_spin
+                self.fancy_log("⏳ ОЖИДАНИЕ", f"Команда !spin игнорируется. Подождите {int(remaining_time)} секунд.")
+
+        elif command.startswith('!headpat'):
+            current_time = time.time()  # Get the current time in seconds
+            time_since_last_headpat = current_time - self.last_headpat_time
+
+            if time_since_last_headpat >= 30:  # Check if 30 seconds have passed
+                # Create pat.txt file
+                with open(self.headpat_file, 'w', encoding='utf-8') as f:
+                    f.write('This is the pat.txt file.')
+                self.last_headpat_time = current_time  # Update the last headpat command time
+                self.fancy_log("🤚 ПАТ", "Создан файл pat.txt")
+            else:
+                # Ignore command and log the cooldown message
+                remaining_time = 30 - time_since_last_headpat
+                self.fancy_log("⏳ ОЖИДАНИЕ", f"Команда !headpat игнорируется. Подождите {int(remaining_time)} секунд.")
+
         else:
             self.fancy_log("❓ НЕИЗВЕСТНО", f"Получена неизвестная команда: {command}")
 
