@@ -22,9 +22,6 @@ ffmpeg-python
 faiss-cpu
 twitchio
 pytchat
-torch
-torchaudio
-torchvision
 SentencePiece
 sacremoses
 tensorboardX
