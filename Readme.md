@@ -12,6 +12,6 @@ Welcome to **HanaAI's** repository! Please choose your preferred language below 
 ---
 *Explore, Learn, and Contribute!*
 
-Email: JoynetOfficial@outlook.com
-Joynet: [Joynet.online]https://www.joynet.online/
-Youtube: [JoystickStudios]https://www.youtube.com/@JoystickStudiosOfficial  
+- Email: JoynetOfficial@outlook.com
+- Joynet: [Joynet.online](https://www.joynet.online)
+- Youtube: [JoystickStudios](https://www.youtube.com/@JoystickStudiosOfficial)  
