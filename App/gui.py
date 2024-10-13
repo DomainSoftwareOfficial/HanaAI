@@ -158,6 +158,8 @@ class App(ctk.CTk):
         self.stop_mic_processing = False  # Flag to stop mic processing
         self.last_spin_time = 0      # Initialize the last spin command time
         self.last_headpat_time = 0   # Initialize the last headpat command time
+        self.random_picker_running = False
+        self.monitor_file_running = False
 
         self.known_emotes = []
 
@@ -269,14 +271,18 @@ class App(ctk.CTk):
         buttons = ["Hana Start", "Hana Stop", "Chloe Start", "Chloe Stop"]
         for i, button_text in enumerate(buttons):
             if button_text == "Hana Start":
-                button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.hana_start)
+                self.hana_start_button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.hana_start)
+                self.hana_start_button.grid(row=0, column=i, padx=10, pady=5, sticky="ew")
             elif button_text == "Hana Stop":
-                button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.hana_stop)
+                self.hana_stop_button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.hana_stop)
+                self.hana_stop_button.grid(row=0, column=i, padx=10, pady=5, sticky="ew")
             elif button_text == "Chloe Start":
-                button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.chloe_start)
-            else:
-                button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.chloe_stop)
-            button.grid(row=0, column=i, padx=10, pady=5, sticky="ew")
+                self.chloe_start_button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.chloe_start)
+                self.chloe_start_button.grid(row=0, column=i, padx=10, pady=5, sticky="ew")
+            elif button_text == "Chloe Stop":
+                self.chloe_stop_button = ctk.CTkButton(button_frame, text=button_text, corner_radius=0, command=self.chloe_stop)
+                self.chloe_stop_button.grid(row=0, column=i, padx=10, pady=5, sticky="ew")
+
 
         self.fancy_log("🖥️ УСТАНОВКА ИНТЕРФЕЙСА", "Кнопки управления созданы.")
 
@@ -354,6 +360,7 @@ class App(ctk.CTk):
         self.mic_start_flag = threading.Event()
         self.stop_random_picker = threading.Event()
         self.stop_monitor_file = threading.Event()
+        self.mic_pause_event = threading.Event()
         self.pause_event = threading.Event()
         self.new_file_ready_event = threading.Event()
 
@@ -466,7 +473,7 @@ class App(ctk.CTk):
 
         if not self.is_recording.is_set():
             # Pause random_picker and set the recording flag
-            self.pause_event.set()
+            self.mic_pause_event.set()
             self.is_recording.set()
 
             # Start the recording loop in a new thread to avoid blocking the UI
@@ -483,7 +490,7 @@ class App(ctk.CTk):
                 self.mic_thread.join()  # Wait for the mic logic to complete
 
             # Resume random_picker
-            self.pause_event.clear()
+            self.mic_pause_event.clear()
 
     def start_recording_loop(self):
         self.fancy_log("🎤 Ожидание разрешения", "Ожидание начала записи с микрофона...")
@@ -591,6 +598,13 @@ class App(ctk.CTk):
         return tts_en
 
     def hana_start(self):
+
+        if self.random_picker_running:
+            self.fancy_log("ℹ️ Информация", "random_picker уже запущен.")
+            return
+
+        self.hana_start_button.configure(state="normal", fg_color="grey")
+
         # Start chat handlers based on the selected platform
         if self.selected_platform == "Youtube":
             self.handler_thread = threading.Thread(target=self.start_youtube_chat, daemon=True)
@@ -608,26 +622,51 @@ class App(ctk.CTk):
         self.stop_random_picker.clear()  # Clear the stop event before starting
         self.picker_thread = threading.Thread(target=self.random_picker, daemon=True)
         self.picker_thread.start()
+        self.random_picker_running = True
+        self.fancy_log("▶️ Hana Запущен", "random_picker запущен.")
 
+    
     def hana_stop(self):
-        # Stop only the random picker thread
-        self.stop_random_picker.set()  # Signal the picker thread to stop
+        if not self.random_picker_running:
+            self.fancy_log("ℹ️ Информация", "random_picker уже остановлен.")
+            return
 
+        self.hana_start_button.configure(state="normal", fg_color="#2FA572")
+
+        # Stop the random picker thread
+        self.stop_random_picker.set()  # Signal the picker thread to stop
+        self.random_picker_running = False
         self.fancy_log("⏹️ Случайный выбор", "Случайный выбор остановлен. Обработчики чата продолжают работать.")
+    
 
     def chloe_start(self):
+        if self.monitor_file_running:
+            self.fancy_log("ℹ️ Информация", "monitor_file уже запущен.")
+            return
+
+        self.chloe_start_button.configure(state="normal", fg_color="grey")
+
         # Clear any stop signals and start the monitoring thread
         self.stop_monitor_file.clear()  # Clear the stop event (make sure it's not set)
         self.pause_event.clear()        # Ensure the pause event is clear
+        self.new_file_ready_event.clear()
         self.monitor_thread = threading.Thread(target=self.monitor_file, daemon=True)
         self.monitor_thread.start()     # Start the monitoring thread
+        self.monitor_file_running = True
         self.fancy_log("📡 Chloe AI", "Мониторинг Chloe AI запущен")
 
     def chloe_stop(self):
+        if not self.monitor_file_running:
+            self.fancy_log("ℹ️ Информация", "monitor_file уже остановлен.")
+            return
+        
+        self.chloe_start_button.configure(state="normal", fg_color="#2FA572")
+
         # Set the stop signal and clear any pause event to ensure the monitor stops cleanly
         self.stop_monitor_file.set()  # Signal to stop the monitoring thread
         self.new_file_ready_event.set()  # Unblock monitor if waiting
         self.pause_event.clear()      # Ensure the pause event is clear
+        self.monitor_file_running = False
         self.fancy_log("📡 Chloe AI", "Остановка мониторинга Chloe AI")
 
     def start_youtube_chat(self):
@@ -736,20 +775,21 @@ class App(ctk.CTk):
         last_formatted_string = None  # Initialize the variable
 
         while not self.stop_random_picker.is_set():  # Check if the stop event is set
-            if self.pause_event.is_set():
+            if self.mic_pause_event.is_set():
                 self.fancy_log("⏸️ Пауза", "random_picker приостановлен для записи с микрофона.")
 
                 # Set mic_start_flag to signal that recording can start
                 self.mic_start_flag.set()
 
                 # Wait until the pause_event is cleared before continuing
-                while self.pause_event.is_set():
+                while self.mic_pause_event.is_set():
                     time.sleep(0.1)
 
                 # Clear the mic_start_flag when random_picker resumes
                 self.mic_start_flag.clear()
                 self.fancy_log("▶️ Возобновление", "random_picker возобновлен.")
     
+            # Check if superchat.chloe has content
             # Check if superchat.chloe has content
             if os.path.exists(superchat_path):
                 with open(superchat_path, 'r', encoding='utf-8') as superchat_file:
@@ -758,9 +798,11 @@ class App(ctk.CTk):
                 if superchat_content and superchat_content != last_superchat_content:
                     # New content detected in superchat.chloe
                     last_superchat_content = superchat_content
-                    self.fancy_log("🔔 СУПЕРЧАТ ДЕТЕКТИРОВАН", "Обнаружено новое содержимое в superchat.chloe!\nПриостановка random_picker для monitor_file.")
-                    self.pause_event.set()  # Pause random_picker
-                    self.new_file_ready_event.set()  # Notify monitor_file
+
+                    if self.monitor_file_running:   
+                        self.fancy_log("🔔 СУПЕРЧАТ ДЕТЕКТИРОВАН", "Обнаружено новое содержимое в superchat.chloe! Приостановка random_picker для monitor_file.")
+                        self.pause_event.set()  # Pause random_picker
+                        self.new_file_ready_event.set()  # Notify monitor_file
                     time.sleep(5)
                     continue
 
@@ -808,7 +850,7 @@ class App(ctk.CTk):
 
             else:
                 # Not in the cycle: Pick between predefined input or viewer input
-                if random.choice([True, False]):
+                if random.choice([True, False]) and self.monitor_file_running:
                     # Pick a predefined input
                     input_text = random.choice(predefined_inputs)
                     viewer_text = "User"
@@ -1082,8 +1124,12 @@ class App(ctk.CTk):
                 # Strip !draw from the input text
                 input_text = input_text.replace("!draw", "").strip()
 
-                # Call the imported function with the stripped input
-                trigger_thread = threading.Thread(target=self.image_generator.generate_image_thread, args=(input_text), daemon=True)
+                # Correctly pass a single-element tuple for args
+                trigger_thread = threading.Thread(
+                    target=self.image_generator.generate_image_thread,
+                    args=(input_text,),  # Note the comma here
+                    daemon=True
+                )
                 trigger_thread.start()
 
                 self.draw_queue.task_done()  # Mark the task as done

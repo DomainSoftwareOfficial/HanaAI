@@ -15,7 +15,7 @@ import threading
 import time
 from datetime import datetime
 
-class CWindow(ctk.CTk):
+class CWindow(ctk.CTkToplevel):
     def __init__(self):
         super().__init__()
 
@@ -310,9 +310,9 @@ def chloe_ai(input_text, model=None):
     log_debug("Файлы успешно прочитаны.")
 
     if chat_set == 'Alpaca':
-        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{input_text}\n\n### Response:\nChloe Hayashi:"
+        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n\n{input_text}\n\n### Response:\nChloe Hayashi:"
     elif chat_set == 'ChatML':
-        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n{input_text}<|im_end|>\n<|im_start|>assistant\nChloe Hayashi:"
+        prompt = f"{instructions_pt1}\n\n{rag}\n\n{instructions_pt2}\n\n{input_text}<|im_end|>\n<|im_start|>assistant\nChloe Hayashi:"
 
     log_debug(f"Сгенерирована подсказка с использованием {chat_set} набора инструкций.")
 

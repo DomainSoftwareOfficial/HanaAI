@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 import time
 
-class HWindow(ctk.CTk):
+class HWindow(ctk.CTkToplevel):
     def __init__(self, app):
         super().__init__()
 
