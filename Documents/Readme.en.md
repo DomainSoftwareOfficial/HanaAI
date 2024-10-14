@@ -147,14 +147,12 @@ This is the repository for HanaAI's Python code for streams and other uses.
 ## Usage
 
 ### If not built
-
     ```
     cd App
     python main.py  
     ```
 
 ### If built
-
     ```
     cd Distribution
     .\Stream
