@@ -672,7 +672,7 @@ class App(ctk.CTk):
     def start_youtube_chat(self):
         load_dotenv()
         video_id = os.getenv('Video-Url')
-        mod_names = ["mod1", "mod2", "mod3"]
+        mod_names = []
         self.youtube_handler = YouTubeChatHandler(video_id, mod_names)
         self.youtube_handler.start()
 
@@ -683,7 +683,7 @@ class App(ctk.CTk):
         nick = os.getenv('Twitch-Nick')
         prefix = os.getenv('Twitch-Prefix')
         initial_channels = [os.getenv('Twitch-Channel')]
-        mod_names = ["mod1", "mod2", "mod3"]
+        mod_names = []
         self.twitch_handler = TwitchChatHandler(token=token, client_id=client_id, nick=nick, prefix=prefix, initial_channels=initial_channels, mod_names=mod_names)
         self.twitch_handler.run()
 
@@ -699,13 +699,13 @@ class App(ctk.CTk):
     def start_alternating_handlers(self):
         load_dotenv()
         video_id = os.getenv('Video-Url')
-        yt_mods = ["mod1", "mod2", "mod3"]
+        yt_mods = []
         token = os.getenv('Twitch-Token')
         client_id = os.getenv('Twitch-Client-ID')
         nick = os.getenv('Twitch-Nick')
         prefix = os.getenv('Twitch-Prefix')
         initial_channels = [os.getenv('Twitch-Channel')]
-        tt_mods = ["mod1", "mod2", "mod3"]
+        tt_mods = []
         self.youtube_handler = YouTubeChatHandler(video_id, yt_mods)
         self.twitch_handler = TwitchChatHandler(token=token, client_id=client_id, nick=nick, prefix=prefix, initial_channels=initial_channels, mod_names=tt_mods)
 
@@ -926,7 +926,11 @@ class App(ctk.CTk):
                     hana_output_path = self.resource_path('../Assets/Audio/hana.wav')
                     mainrvc(ai_output_path, hana_output_path)
 
-                    play(hana_output_path, self.selected_output_device_index)
+                    if os.getenv('Art-On', 'True').lower() == 'true':
+                        with open(self.resource_path("../Data/Output/hana.txt"), "w", encoding='utf-8') as file:
+                            file.write("Аудио готово")
+                    else:
+                        play(hana_output_path, self.selected_output_device_index)
 
                     # **Clear the HWindow text after hana.wav is created**
                     if self.hana_window and isinstance(self.hana_window, HWindow):
@@ -1025,7 +1029,11 @@ class App(ctk.CTk):
                         with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
                             superviewer_file.write('')  # Empty the file content after use
 
-                        play(distorted_output_path, self.selected_output_device_index)
+                        if os.getenv('Art-On', 'True').lower() == 'true':
+                            with open(self.resource_path("../Data/Output/chloe.txt"), "w", encoding='utf-8') as file:
+                                file.write("Аудио готово")
+                        else:
+                            play(distorted_output_path, self.selected_output_device_index)
 
                         if self.chloe_window and isinstance(self.chloe_window, CWindow):
                             self.chloe_window.update_textbox("")  # Clear the text
@@ -1058,7 +1066,7 @@ class App(ctk.CTk):
         # Handle the !draw command only if Art-On is set to True
         if command.startswith('!draw'):
             # Check if Art-On environment variable is set to "True"
-            if os.getenv('Art-On', 'False').lower() == 'true':
+            if os.getenv('Art-On', 'True').lower() == 'true':
                 self.handle_draw_command(command)
             else:
                 self.fancy_log("🎨 РЕЖИМ ИСКУССТВА", "Art-On отключен, игнорирование команды !draw.")

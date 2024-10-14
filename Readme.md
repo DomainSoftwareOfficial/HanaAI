@@ -1,6 +1,6 @@
 # **HanaAI**
 
-Welcome to **HanaAI's** repository! Please choose your preferred language below to get started:
+Welcome to **HanaAI's** repository! Please choose your preferred language below:
 
 **Available Languages**:
 
