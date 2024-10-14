@@ -148,14 +148,12 @@ Este es el repositorio del código en Python de HanaAI para transmisiones y otro
 ## Uso
 
 ### Si no está construido
-
     ```
     cd App
     python main.py  
     ```
 
 ### Si está construido
-
     ```
     cd Distribution
     .\Stream

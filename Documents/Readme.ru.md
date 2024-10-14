@@ -146,14 +146,12 @@
 ## Использование
 
 ### Если не собрано
-
     ```
     cd App
     python main.py  
     ```
 
 ### Если собрано
-
     ```
     cd Distribution
     .\Stream

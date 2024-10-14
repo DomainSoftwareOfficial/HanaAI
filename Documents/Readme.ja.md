@@ -147,14 +147,12 @@
 ## 使用方法
 
 ### ビルドしていない場合
-
     ```
     cd App
     python main.py  
     ```
 
 ### ビルド済みの場合
-
     ```
     cd Distribution
     .\Stream
