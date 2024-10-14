@@ -149,14 +149,14 @@ Este es el repositorio del código en Python de HanaAI para transmisiones y otro
 
 ### Si no está construido
 
-    ```bash
+    ```
     cd App
     python main.py  
     ```
 
 ### Si está construido
 
-    ```bash
+    ```
     cd Distribution
     .\Stream
     ```

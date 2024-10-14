@@ -148,14 +148,14 @@
 
 ### ビルドしていない場合
 
-    ```bash
+    ```
     cd App
     python main.py  
     ```
 
 ### ビルド済みの場合
 
-    ```bash
+    ```
     cd Distribution
     .\Stream
     ```

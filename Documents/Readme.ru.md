@@ -147,14 +147,14 @@
 
 ### Если не собрано
 
-    ```bash
+    ```
     cd App
     python main.py  
     ```
 
 ### Если собрано
 
-    ```bash
+    ```
     cd Distribution
     .\Stream
     ```
