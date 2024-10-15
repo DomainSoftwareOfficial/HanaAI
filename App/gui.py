@@ -926,7 +926,7 @@ class App(ctk.CTk):
                     hana_output_path = self.resource_path('../Assets/Audio/hana.wav')
                     mainrvc(ai_output_path, hana_output_path)
 
-                    if os.getenv('Art-On', 'True').lower() == 'true':
+                    if os.getenv('Avatar-On') == 'True':
                         with open(self.resource_path("../Data/Output/hana.txt"), "w", encoding='utf-8') as file:
                             file.write("Аудио готово")
                     else:
@@ -1029,7 +1029,7 @@ class App(ctk.CTk):
                         with open(superviewer_path, 'w', encoding='utf-8') as superviewer_file:
                             superviewer_file.write('')  # Empty the file content after use
 
-                        if os.getenv('Art-On', 'True').lower() == 'true':
+                        if os.getenv('Avatar-On') == 'True':
                             with open(self.resource_path("../Data/Output/chloe.txt"), "w", encoding='utf-8') as file:
                                 file.write("Аудио готово")
                         else:
@@ -1066,7 +1066,7 @@ class App(ctk.CTk):
         # Handle the !draw command only if Art-On is set to True
         if command.startswith('!draw'):
             # Check if Art-On environment variable is set to "True"
-            if os.getenv('Art-On', 'True').lower() == 'true':
+            if os.getenv('Art-On') == 'True':
                 self.handle_draw_command(command)
             else:
                 self.fancy_log("🎨 РЕЖИМ ИСКУССТВА", "Art-On отключен, игнорирование команды !draw.")
