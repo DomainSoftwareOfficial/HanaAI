@@ -766,6 +766,9 @@ class App(ctk.CTk):
             "Change subject to guns.",
         ]
 
+        mod_file = self.resource_path('../Data/Chat/Special/moderator.hana')
+        message_file = self.resource_path('../Data/Chat/Special/modmessage.hana')
+
         self.cycle_active = False  # Tracks if we are in the predefined-input cycle
         self.predefined_input_flag = False  # Tracks if predefined input was chosen
         output_chloe_path = self.resource_path('../Data/Output/output.chloe')  # Monitor file output
@@ -788,8 +791,7 @@ class App(ctk.CTk):
                 # Clear the mic_start_flag when random_picker resumes
                 self.mic_start_flag.clear()
                 self.fancy_log("▶️ Возобновление", "random_picker возобновлен.")
-    
-            # Check if superchat.chloe has content
+
             # Check if superchat.chloe has content
             if os.path.exists(superchat_path):
                 with open(superchat_path, 'r', encoding='utf-8') as superchat_file:
@@ -867,6 +869,13 @@ class App(ctk.CTk):
                     # Open the viewer files with UTF-8 encoding
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
+
+                    '''
+                    Todo: 
+                     - Input the mod names list to random_picker
+                     - One done, then right here cross check the viewers with the mod names
+                     - Then, if this rings true, then it will use the modmessage and modviewer as input. 
+                    '''
 
                     # Before processing the input_text, validate if it's a proper UTF-8 string
                     if not self.is_valid_utf8(input_text):

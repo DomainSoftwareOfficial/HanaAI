@@ -2,35 +2,47 @@ import os
 import sys
 import subprocess
 
-def build():
-    # Define paths for output
-    current_dir = os.getcwd()  # Get current working directory
-    dist_path = os.path.join(current_dir, 'Distribution')  # Specify your distribution directory
-    build_path = os.path.join(current_dir, 'Build')  # Specify your build directory
-    spec_path = os.path.join(current_dir, 'Utilities', 'Miscellaneous')  # Ensure the spec_path is correct
+CURRENT_DIR = os.getcwd()
+VENV_PATH = os.path.join(CURRENT_DIR, 'Environment')
+DIST_PATH = os.path.join(CURRENT_DIR, 'Distribution')
+BUILD_PATH = os.path.join(CURRENT_DIR, 'Build')
+SPEC_PATH = os.path.join(CURRENT_DIR, 'Utilities', 'Miscellaneous')
+APP_PATH = os.path.join(CURRENT_DIR, 'App')
+PYTHON_EXECUTABLE = os.path.join(VENV_PATH, 'Scripts', 'python.exe')
 
-    # Activate the virtual environment
-    venv_path = os.path.join(current_dir, 'Environment')  # Adjust this to the path of your virtual environment
-    python_executable = os.path.join(venv_path, 'Scripts', 'python.exe')
-    
-    # Define the PyInstaller command using the Python from the venv
+EMOJI_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'emoji')
+WHISPER_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'whisper')
+TORCH_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'torch')
+
+def build():
+    # Prepare PyInstaller command
     pyinstaller_command = [
-        python_executable,
+        PYTHON_EXECUTABLE,
         '-m', 'PyInstaller',
         '--onefile',
-        '--windowed' if sys.platform == "win32" else '',
         '--name', 'stream',
-        '--distpath', dist_path,
-        '--workpath', build_path,
-        '--specpath', spec_path,  # Set the location for the .spec file
-        'App/main.py'  # Path to your main Python script
+        '--distpath', DIST_PATH,
+        '--workpath', BUILD_PATH,
+        '--specpath', SPEC_PATH,
+        '--paths', APP_PATH,
+        '--add-data', f'{EMOJI_PACKAGE}/unicode_codes/*.json;emoji/unicode_codes',
+        '--add-data', f'{TORCH_PACKAGE}/**/*.py;torch',
+        '--add-data', f'{WHISPER_PACKAGE}/normalizers/*.json;whisper/normalizers',
+        '--add-data', f'{WHISPER_PACKAGE}/assets/*.npz;whisper/assets',
+        '--add-data', f'{WHISPER_PACKAGE}/assets/*.tiktoken;whisper/assets',
+        os.path.join(APP_PATH, 'main.py')
     ]
 
-    # Remove any empty strings from the command list
-    pyinstaller_command = [arg for arg in pyinstaller_command if arg]
+    # Platform-specific options (e.g., Windows)
+    if sys.platform == "win32":
+        pyinstaller_command.append('--windowed')
 
-    # Run the PyInstaller command
-    subprocess.run(pyinstaller_command)
+    try:
+        # Run PyInstaller
+        subprocess.run(pyinstaller_command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Build failed with error: {e}")
+        sys.exit(1)
 
 if __name__ == '__main__':
     build()
