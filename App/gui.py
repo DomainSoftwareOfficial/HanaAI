@@ -440,21 +440,13 @@ class App(ctk.CTk):
 
     def update_slider1_value(self, value):
         """Update the value of slider 1 in the text file."""
-        try:
-            with open(self.slider1_file, 'w') as file:
+        with open(self.slider1_file, 'w') as file:
                 file.write(f"{value:.2f}")  # Write the slider value to the file
-            self.fancy_log("📂 ОБНОВЛЕНИЕ ФАЙЛА", f"Значение слайдера 1 записано: {value:.2f}")
-        except Exception as e:
-            self.fancy_log("❌ ОШИБКА", f"Не удалось записать значение слайдера 1: {e}")
 
     def update_slider2_value(self, value):
         """Update the value of slider 2 in the text file."""
-        try:
-            with open(self.slider2_file, 'w') as file:
+        with open(self.slider2_file, 'w') as file:
                 file.write(f"{value:.2f}")  # Write the slider value to the file
-            self.fancy_log("📂 ОБНОВЛЕНИЕ ФАЙЛА", f"Значение слайдера 2 записано: {value:.2f}")
-        except Exception as e:
-            self.fancy_log("❌ ОШИБКА", f"Не удалось записать значение слайдера 2: {e}")
 
     def create_text_file(self, button_text):
         """Function to create a text file based on the button clicked."""
