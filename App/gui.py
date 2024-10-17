@@ -140,8 +140,15 @@ class App(ctk.CTk):
 
 
         self.folder_to_clear = self.resource_path('../Data/Output')
+        self.protected_files = [
+            self.resource_path('../Data/Output/voice.txt'),
+            self.resource_path('../Data/Output/music.txt')
+        ]
         self.delete_all_files_in_folder(self.folder_to_clear)
         self.fancy_log("🗑️ ОЧИСТКА ПАПКИ", f"Очистил папку: {self.folder_to_clear}")
+
+        self.slider1_file = self.resource_path('../Data/Output/voice.txt')
+        self.slider2_file = self.resource_path('../Data/Output/music.txt')
 
         self.after_id = None
         self.youtube_handler = None
@@ -313,10 +320,12 @@ class App(ctk.CTk):
             label = ctk.CTkLabel(left_frame, text=text)
             label.grid(row=1, column=i+1, padx=5, sticky="n")
 
-        # Sliders
-        for i in range(2):
-            slider = ctk.CTkSlider(left_frame)
-            slider.grid(row=2+i, column=1, columnspan=4, pady=5, sticky="ew")  # Centered within the section
+        # Create the sliders and bind them to a method to update the text files
+        self.slider1 = ctk.CTkSlider(left_frame, from_=0, to=1, command=self.update_slider1_value)
+        self.slider1.grid(row=2, column=1, columnspan=4, pady=5, sticky="ew")
+        
+        self.slider2 = ctk.CTkSlider(left_frame, from_=0, to=1, command=self.update_slider2_value)
+        self.slider2.grid(row=3, column=1, columnspan=4, pady=5, sticky="ew")
 
         self.is_recording = threading.Event()  # Event to signal when recording is active
 
@@ -415,7 +424,7 @@ class App(ctk.CTk):
                 file_path = os.path.join(folder_path, file_name)
 
                 # Check if it's a file or directory
-                if os.path.isfile(file_path):
+                if file_path not in self.protected_files and os.path.isfile(file_path):
                     # Delete the file
                     os.remove(file_path)
                     self.fancy_log("🗑️ Файл удален", f"Удален файл: {file_path}")
@@ -428,6 +437,24 @@ class App(ctk.CTk):
 
         except Exception as e:
             self.fancy_log("❌ Ошибка", f"Ошибка при удалении файлов: {e}")
+
+    def update_slider1_value(self, value):
+        """Update the value of slider 1 in the text file."""
+        try:
+            with open(self.slider1_file, 'w') as file:
+                file.write(f"{value:.2f}")  # Write the slider value to the file
+            self.fancy_log("📂 ОБНОВЛЕНИЕ ФАЙЛА", f"Значение слайдера 1 записано: {value:.2f}")
+        except Exception as e:
+            self.fancy_log("❌ ОШИБКА", f"Не удалось записать значение слайдера 1: {e}")
+
+    def update_slider2_value(self, value):
+        """Update the value of slider 2 in the text file."""
+        try:
+            with open(self.slider2_file, 'w') as file:
+                file.write(f"{value:.2f}")  # Write the slider value to the file
+            self.fancy_log("📂 ОБНОВЛЕНИЕ ФАЙЛА", f"Значение слайдера 2 записано: {value:.2f}")
+        except Exception as e:
+            self.fancy_log("❌ ОШИБКА", f"Не удалось записать значение слайдера 2: {e}")
 
     def create_text_file(self, button_text):
         """Function to create a text file based on the button clicked."""
