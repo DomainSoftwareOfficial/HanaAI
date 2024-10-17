@@ -349,6 +349,8 @@ class App(ctk.CTk):
         self.hana_window = None  # Reference to the HWindow
         self.chloe_window = None
 
+        self.mod_names = ['Joykill']
+
         # Example button to open additional windows
         open_window1_button = ctk.CTkButton(self, text="Open Chloe Chatter", command=self.open_window1, corner_radius=0)
         open_window1_button.grid(row=6, column=0, padx=10, pady=10, sticky="ew")
@@ -672,8 +674,7 @@ class App(ctk.CTk):
     def start_youtube_chat(self):
         load_dotenv()
         video_id = os.getenv('Video-Url')
-        mod_names = []
-        self.youtube_handler = YouTubeChatHandler(video_id, mod_names)
+        self.youtube_handler = YouTubeChatHandler(video_id, self.mod_names)
         self.youtube_handler.start()
 
     def start_twitch_chat(self):
@@ -683,8 +684,7 @@ class App(ctk.CTk):
         nick = os.getenv('Twitch-Nick')
         prefix = os.getenv('Twitch-Prefix')
         initial_channels = [os.getenv('Twitch-Channel')]
-        mod_names = []
-        self.twitch_handler = TwitchChatHandler(token=token, client_id=client_id, nick=nick, prefix=prefix, initial_channels=initial_channels, mod_names=mod_names)
+        self.twitch_handler = TwitchChatHandler(token=token, client_id=client_id, nick=nick, prefix=prefix, initial_channels=initial_channels, mod_names=self.mod_names)
         self.twitch_handler.run()
 
     def is_valid_utf8(self, text):
@@ -832,6 +832,28 @@ class App(ctk.CTk):
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
 
+
+                    # Check if the modviewer file has content
+                    with open(mod_file, 'r', encoding='utf-8') as modviewer_infile:
+                        modviewer_content = modviewer_infile.read().strip()
+
+                    if modviewer_content:  # If content exists in modviewer
+                        self.fancy_log("🔍 Модератор обнаружен", f"Модератор {viewer_text} обнаружен, используется специальный ввод.")
+                            
+                        # Save content of moderator and message files
+                        with open(mod_file, 'r', encoding='utf-8') as mod_infile:
+                            viewer_text = mod_infile.read().strip()  # Save moderator file content to viewer_text
+
+                        with open(message_file, 'r', encoding='utf-8') as message_infile:
+                            input_text = message_infile.read().strip()  # Save message file content to input_text
+                            
+                        # Now clear the contents of both modmessage and moderator files
+                        with open(mod_file, 'w', encoding='utf-8') as mod_infile:
+                            mod_infile.write("")  # Clear the content
+
+                        with open(message_file, 'w', encoding='utf-8') as message_infile:
+                            message_infile.write("")  # Clear the content
+
                     # Before processing the input_text, validate if it's a proper UTF-8 string
                     if not self.is_valid_utf8(input_text):
                         self.fancy_log("⚠️ НЕДОПУСТИМАЯ UTF-8", f"Пропуск недопустимого UTF-8 ввода: '{input_text}'")
@@ -870,12 +892,26 @@ class App(ctk.CTk):
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
 
-                    '''
-                    Todo: 
-                     - Input the mod names list to random_picker
-                     - One done, then right here cross check the viewers with the mod names
-                     - Then, if this rings true, then it will use the modmessage and modviewer as input. 
-                    '''
+                    # Check if the modviewer file has content
+                    with open(mod_file, 'r', encoding='utf-8') as modviewer_infile:
+                        modviewer_content = modviewer_infile.read().strip()
+
+                    if modviewer_content:  # If content exists in modviewer
+                        self.fancy_log("🔍 Модератор обнаружен", f"Модератор {viewer_text} обнаружен, используется специальный ввод.")
+                            
+                        # Save content of moderator and message files
+                        with open(mod_file, 'r', encoding='utf-8') as mod_infile:
+                            viewer_text = mod_infile.read().strip()  # Save moderator file content to viewer_text
+
+                        with open(message_file, 'r', encoding='utf-8') as message_infile:
+                            input_text = message_infile.read().strip()  # Save message file content to input_text
+                            
+                        # Now clear the contents of both modmessage and moderator files
+                        with open(mod_file, 'w', encoding='utf-8') as mod_infile:
+                            mod_infile.write("")  # Clear the content
+
+                        with open(message_file, 'w', encoding='utf-8') as message_infile:
+                            message_infile.write("")  # Clear the content
 
                     # Before processing the input_text, validate if it's a proper UTF-8 string
                     if not self.is_valid_utf8(input_text):
