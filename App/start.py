@@ -2,7 +2,10 @@ import customtkinter as ctk
 import tkinter as tk
 import os
 import sys
-from gui import App
+import random
+import string
+from gui import Stream
+from gui import Record
 from audio import list_microphones, list_output_devices  
 
 class StartWindow(ctk.CTk):
@@ -10,7 +13,7 @@ class StartWindow(ctk.CTk):
         super().__init__()
 
         self.title("Setup")
-        self.geometry("300x500")  # Adjust height to fit all widgets
+        self.geometry("350x625")  # Adjust height to fit all widgets
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
@@ -66,13 +69,29 @@ class StartWindow(ctk.CTk):
                                                   corner_radius=0, width=max_width)
         self.dropdown_menu4.pack(padx=20, pady=10, ipady=2)
 
-        # Add extra space before the Start button
+        # New dropdown for folder selection in ../Assets/Audio
+        self.audio_folder_label = ctk.CTkLabel(self, text="Select Audio Folder", text_color="grey")
+        self.audio_folder_label.pack(pady=(20, 0))
+        self.dropdown_var5 = tk.StringVar(value="None")
+        audio_folders = self.list_folders_in_directory(self.resource_path("../Assets/Audio"))  # List of folders in ../Assets/Audio
+        self.dropdown_menu5 = ctk.CTkOptionMenu(self, variable=self.dropdown_var5, 
+                                                values=["None"] + audio_folders,  # Add "None" as an option
+                                                corner_radius=0, width=max_width)
+        self.dropdown_menu5.pack(padx=20, pady=10, ipady=2)
+
+        # Add extra space before the buttons
         self.extra_space_label = ctk.CTkLabel(self, text="", text_color="grey")  # Invisible label for spacing
         self.extra_space_label.pack(pady=(20, 0))
 
-        # Start button
-        self.start_button = ctk.CTkButton(self, text="Start", command=self.start_app, corner_radius=0)
-        self.start_button.pack(pady=10, fill="x", padx=20)  # Maintain padding for the button
+        # Two buttons (Stream and Record) side by side
+        self.button_frame = ctk.CTkFrame(self)
+        self.button_frame.pack(pady=10, padx=20, fill="x")
+
+        self.stream_button = ctk.CTkButton(self.button_frame, text="Stream", command=self.start_stream, corner_radius=0)
+        self.stream_button.pack(side="left", expand=True, padx=5, pady=10)
+
+        self.record_button = ctk.CTkButton(self.button_frame, text="Record", command=self.start_record, corner_radius=0)
+        self.record_button.pack(side="right", expand=True, padx=5, pady=10)
 
     def list_files_in_folder(self, folder_path, file_extension):
         """List files in the given folder path that match the specified extension."""
@@ -83,54 +102,72 @@ class StartWindow(ctk.CTk):
             print(f"Error: Folder '{folder_path}' not found.")
             return []
 
-    def start_app(self):
-        # Get the selected microphone and output device names
+    def list_folders_in_directory(self, folder_path):
+        """List only folders in the given folder path."""
+        try:
+            folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
+            return folders
+        except FileNotFoundError:
+            print(f"Error: Folder '{folder_path}' not found.")
+            return []
+        
+    def create_random_folder(self, base_path):
+        """Creates a random-named folder under the specified base path."""
+        random_folder_name = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        random_folder_path = os.path.join(base_path, random_folder_name)
+        os.makedirs(random_folder_path, exist_ok=True)
+        return random_folder_path
+
+    def start_stream(self):
+        """Starts the stream window with the same functionality as the previous 'start_app'."""
         selected_mic_name = self.dropdown_var1.get()
         selected_output_device_name = self.dropdown_var3.get()
 
-        # Find the corresponding indices
         selected_mic_index = next((idx for name, idx in self.microphones if name == selected_mic_name), None)
         selected_output_device_index = next((idx for name, idx in self.output_devices if name == selected_output_device_name), None)
 
-        # Ensure a valid output device index is selected
         if selected_output_device_index is None:
             print("Error: No valid output device selected.")
             return
 
-        # Get the selected platform
         selected_platform = self.dropdown_var2.get()
 
         selected_llm = self.dropdown_var4.get()
         if selected_llm == "None":
-            selected_llm = None  # Handle None case if no file is selected
+            selected_llm = None
         else:
-            # If a file is selected, create the full path
             selected_llm = self.resource_path(f"../Utilities/Models/{selected_llm}")
 
-        # Print out the selected file (or None)
         print(f"Selected File: {selected_llm}")
 
-        # Destroy the start window
         self.destroy()
-
-        # Initialize and start the main application
-        app = App(selected_mic_index, selected_output_device_index, selected_platform, selected_llm)
+        app = Stream(selected_mic_index, selected_output_device_index, selected_platform, selected_llm)
         app.mainloop()
 
+    def start_record(self):
+        """Starts a new record window."""
+        selected_audio_folder = self.dropdown_var5.get()
+
+        # If "None" is selected, create a new folder
+        if selected_audio_folder == "None":
+            selected_audio_folder = self.create_random_folder(self.resource_path("../Assets/Audio"))
+        
+        print(f"Selected/Generated Audio Folder: {selected_audio_folder}")
+
+        self.destroy()
+        record_window = Record(selected_audio_folder)
+        record_window.mainloop()
+
     def destroy(self):
-        # Cancel all after callbacks before destroying the window
         for after_id in self.after_ids:
             self.after_cancel(after_id)
-        
         super().destroy()
 
     def resource_path(self, relative_path):
-        """ Get the absolute path to the resource, works for dev and for PyInstaller """
+        """Get the absolute path to the resource, works for dev and for PyInstaller."""
         try:
-            # If using PyInstaller, sys._MEIPASS will be set to the temporary folder where files are extracted
             base_path = sys._MEIPASS
         except AttributeError:
-            # Otherwise, use the current directory
             base_path = os.path.abspath(".")
         return os.path.join(base_path, relative_path)
 

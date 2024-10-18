@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import tkinter as tk
 import customtkinter as ctk
 import random
 import threading
@@ -11,6 +12,9 @@ import shutil
 import queue
 import re
 import unicodedata
+import sounddevice as sd
+import numpy as np
+import wavio
 from datetime import datetime
 from dotenv import load_dotenv
 from chloe import CWindow
@@ -115,7 +119,7 @@ class TextBoxFrame(ctk.CTkFrame):
         # Print the final log message with the prefix
         print(f"{prefix}{message}")
 
-class App(ctk.CTk):
+class Stream(ctk.CTk):
     def __init__(self, microphone_index=None, output_device_index=None, selected_platform="None", selected_llm=None):
         super().__init__()
 
@@ -1304,3 +1308,288 @@ class App(ctk.CTk):
         if self.after_id is not None:
             self.after_cancel(self.after_id)
         super().destroy()
+
+
+class Record(ctk.CTk):
+    def __init__(self, folder_path):
+        super().__init__()
+        self.title("Record")
+        self.geometry("600x400")
+
+        # Store the folder path
+        self.folder_path = folder_path
+        self.current_files = []  # List to keep track of current files
+
+        # Log and load the Whisper model
+        self.fancy_log("🔄 ЗАГРУЗКА", "Загрузка Whisper Large Model...")
+        self.model = whisper.load_model("large")  # Load Whisper large model
+        self.fancy_log("✅ УСПЕШНО", "Whisper Large Model загружена.")
+
+        # Create a main frame to hold both the folder view and controls
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Create a frame for folder contents (left side)
+        self.folder_frame = ctk.CTkFrame(self.main_frame, width=200)
+        self.folder_frame.pack(side="left", fill="y", padx=(0, 10))
+
+        # Create a Listbox to show folder contents
+        self.file_listbox = tk.Listbox(self.folder_frame, width=30, height=20)
+        self.file_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Populate the listbox with folder contents
+        self.load_folder_contents(self.folder_path)
+
+        # Create a frame for the controls (right side)
+        self.controls_frame = ctk.CTkFrame(self.main_frame, width=300)
+        self.controls_frame.pack(side="right", fill="both", expand=True)
+
+        # Create a textbox at the top with the same width as buttons and switches
+        self.textbox = ctk.CTkTextbox(self.controls_frame, height=100, width=300)
+        self.textbox.pack(pady=(20, 10), padx=20)
+
+        # Create a frame for Start and Stop buttons
+        self.button_frame = ctk.CTkFrame(self.controls_frame)
+        self.button_frame.pack(pady=10, padx=20)
+
+        # Start button
+        self.start_button = ctk.CTkButton(self.button_frame, text="Start", width=140, command=self.start_recording, corner_radius=0)
+        self.start_button.pack(side="left", padx=(0, 5))
+
+        # Stop button
+        self.stop_button = ctk.CTkButton(self.button_frame, text="Stop", width=140, command=self.stop_recording, corner_radius=0)
+        self.stop_button.pack(side="right", padx=(5, 0))
+
+        # Create a frame for the language switches and place it at the bottom of the controls frame
+        self.switch_frame = ctk.CTkFrame(self.controls_frame)
+        self.switch_frame.pack(pady=10, padx=5, side="bottom", anchor="s")  # Positioning at the bottom
+
+        # Language switches with fixed width and spacing to fit nicely
+        self.switch_en = ctk.CTkSwitch(self.switch_frame, text="EN", width=60)
+        self.switch_en.pack(side="left", padx=5)
+
+        self.switch_es = ctk.CTkSwitch(self.switch_frame, text="ES", width=60)
+        self.switch_es.pack(side="left", padx=5)
+
+        self.switch_ru = ctk.CTkSwitch(self.switch_frame, text="RU", width=60)
+        self.switch_ru.pack(side="left", padx=5)
+
+        self.switch_ja = ctk.CTkSwitch(self.switch_frame, text="JA", width=60)
+        self.switch_ja.pack(side="left", padx=5)
+
+        # Start a periodic check to update the file list
+        self.monitor_folder()
+
+        # Bind 'r' and 's' keys to start and stop actions
+        self.bind("<r>", lambda event: self.start_recording())
+        self.bind("<s>", lambda event: self.stop_recording())
+        self.focus_set()  # Set focus to the window to capture keypresses
+
+        self.textbox.bind("<Return>", self.transcribe_and_process)
+
+    def transcribe_and_process(self, event):
+        """Transcribe the text and process it."""
+        # Get the text from the textbox
+        input_text = self.textbox.get("1.0", tk.END).strip()
+        if not input_text:
+            self.fancy_log("⚠️ ВНИМАНИЕ", "Введите текст для транскрипции.")
+            return
+
+        # Determine the selected language
+        selected_language = self.get_selected_language()
+
+        # Transcribe the text based on the selected language
+        translated_text = translate(input_text, selected_language)
+
+        # Generate audio based on the selected language
+        audio_output_path = os.path.join(self.folder_path, 'ai.wav')
+        if selected_language == 'en':
+            tts_en(translated_text, output_path=audio_output_path)
+        elif selected_language == 'ru':
+            tts_ru(translated_text, output_path=audio_output_path)
+        elif selected_language == 'es':
+            tts_es(translated_text, output_path=audio_output_path)
+        elif selected_language == 'ja':
+            tts_ja(translated_text, output_path=audio_output_path)
+        else:
+            self.fancy_log("⚠️ ВНИМАНИЕ", "Неверный язык выбран.")
+            return
+
+        processed_audio_path = os.path.join(self.folder_path, 'processed.wav')
+        os.makedirs(os.path.dirname(processed_audio_path), exist_ok=True)  # Create the subdirectory if it doesn't exist
+
+        # Call mainrvc to process the audio
+        mainrvc(audio_output_path, processed_audio_path)
+        shutil.move(self.resource_path('../Assets/Audio/processed.wav'), self.resource_path(f'{self.folder_path}/processed.wav'))
+
+        # Check if processed audio file exists before renaming
+        if os.path.exists(processed_audio_path):
+            # Prompt user for the filename to save the final audio
+            filename = tk.simpledialog.askstring("Save File", "Введите имя файла для сохранения (без расширения):")
+            if filename:
+                final_audio_path = os.path.join(self.folder_path, f"{filename}.wav")
+                os.rename(processed_audio_path, final_audio_path)  # Rename the processed file
+
+                # Clean up
+                self.clean_up_unwanted_files(audio_output_path, processed_audio_path)
+
+                self.fancy_log("✅ УСПЕШНО", f"Файл сохранен как: {final_audio_path}")
+            else:
+                self.fancy_log("⚠️ ВНИМАНИЕ", "Имя файла не введено. Аудиофайл не сохранен.")
+        else:
+            self.fancy_log("⚠️ ВНИМАНИЕ", f"Файл не найден: {processed_audio_path}. Проверьте, был ли он создан.")
+
+    def get_selected_language(self, input_text):
+        """Determine the selected language based on the switches."""
+        if self.switch_en.get():
+            return 'en'
+        elif self.switch_ru.get():
+            return 'ru'
+        elif self.switch_es.get():
+            return 'es'
+        elif self.switch_ja.get():
+            return 'ja'
+        
+        # If none of the switches are selected, assume English by default
+        return 'en'
+
+    def clean_up_unwanted_files(self, *files):
+        """Remove or move unwanted audio files after processing."""
+        for file in files:
+            if os.path.exists(file):
+                os.remove(file)  # Remove the unwanted file
+
+    def load_folder_contents(self, folder_path):
+        """Load and display the folder contents in the Listbox."""
+        if os.path.exists(folder_path):
+            files = os.listdir(folder_path)
+            self.current_files = files  # Keep track of current files
+
+            self.file_listbox.delete(0, tk.END)  # Clear the listbox
+            for file in files:
+                self.file_listbox.insert(tk.END, file)  # Insert each file/folder into the listbox
+        else:
+            self.file_listbox.insert(tk.END, "Folder not found")
+
+    def monitor_folder(self):
+        """Monitor the folder for changes and update the Listbox if new files are detected."""
+        if os.path.exists(self.folder_path):
+            current_files = os.listdir(self.folder_path)
+            if current_files != self.current_files:
+                # If there are changes, update the listbox
+                self.current_files = current_files
+                self.file_listbox.delete(0, tk.END)  # Clear the listbox
+                for file in current_files:
+                    self.file_listbox.insert(tk.END, file)  # Insert updated file list
+        else:
+            self.file_listbox.delete(0, tk.END)
+            self.file_listbox.insert(tk.END, "Folder not found")
+
+        # Check the folder again after 2 seconds (2000 milliseconds)
+        self.after(2000, self.monitor_folder)
+
+    def start_recording(self):
+        """Start recording audio from the microphone."""
+        self.fancy_log("📹 НАЧАЛО ЗАПИСИ", "Запись началась...")
+        self.start_button.configure(state="disabled")  # Disable the start button
+        self.stop_button.configure(state="normal")  # Enable the stop button
+        
+        self.recorded_audio = []  # Clear any previous recordings
+        self.is_recording = True  # Set recording flag
+
+        # Start recording in a separate thread
+        self.recording_thread = threading.Thread(target=self.record_audio)
+        self.recording_thread.start()
+
+
+    def record_audio(self):
+        """Capture audio data from the microphone."""
+        self.fancy_log("🔊 ЗАПИСЬ", "Говорите теперь...")
+        
+        while self.is_recording:
+            # Record 1 second of audio
+            audio_chunk = sd.rec(int(1 * self.sample_rate), samplerate=self.sample_rate, channels=1, dtype='float64')
+            sd.wait()  # Wait until the recording is finished
+            self.recorded_audio.append(audio_chunk)  # Append recorded chunk to the list
+
+
+
+    def stop_recording(self):
+        """Stop recording audio and process it."""
+        self.fancy_log("🛑 ОСТАНОВКА ЗАПИСИ", "Запись остановлена.")
+        self.stop_button.configure(state="disabled")  # Disable the stop button
+        self.start_button.configure(state="normal")  # Enable the start button
+
+        self.is_recording = False  # Stop the recording loop
+        self.recording_thread.join()  # Wait for the thread to finish
+
+        # Convert recorded audio to numpy array
+        recorded_audio_np = np.concatenate(self.recorded_audio, axis=0)
+
+        # Save the recorded audio as a WAV file
+        audio_file_path = os.path.join(self.folder_path, "recorded_audio.wav")
+        wavio.write(audio_file_path, recorded_audio_np, self.sample_rate, sampwidth=3)
+
+        # Transcribe the recorded audio using Whisper
+        self.transcribe_audio(audio_file_path)
+
+    def transcribe_audio(self, audio_file_path):
+        """Transcribe the recorded audio and display the text."""
+        self.fancy_log("📝 ТРАНСКРИПЦИЯ", "Транскрибируем аудио...")
+        # Use the Whisper model to transcribe the audio
+        result = self.model.transcribe(audio_file_path)
+        transcribed_text = result["text"]
+
+        # Display the transcribed text in the textbox
+        self.textbox.delete("1.0", tk.END)  # Clear the textbox
+        self.textbox.insert(tk.END, transcribed_text)  # Insert the transcribed text
+
+    def fancy_log(self, header, body, width=150):
+        # Validate and convert width to integer
+        if not isinstance(width, int):
+            try:
+                width = int(width)
+            except ValueError:
+                raise TypeError("Width must be an integer.")
+
+        # Get the current timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Prepare colors
+        header_color = "\033[1;36m"  # Bright Cyan for header
+        body_color = "\033[0;32m"    # Green for body
+        reset_color = "\033[0m"      # Reset color
+
+        # Prepare the log message header
+        log_header = f"{timestamp} | INFO | {header_color}{header}{reset_color} :: "
+        header_width = self.calculate_display_width(log_header)
+
+        # Calculate total width available for the body
+        total_width = width - header_width - 3  # 3 for the " |"
+        
+        # Truncate the body if it's too long
+        if len(body) > total_width:
+            body = body[:total_width - len("...{скрытый}")].rstrip() + "...{скрытый}"
+
+        # Apply the body color and generate the log output
+        log_output = f"{log_header}{body_color}{body}{reset_color}".ljust(width)
+
+        # Print the formatted log
+        print("=" * (width - 1) + "=")
+        print(log_output)
+        print("=" * (width - 1) + "=")
+        print()  # Print a new line after the log entry
+
+    def calculate_display_width(self, text):
+        """Helper method to calculate the display width of the log text."""
+        return len(text)
+    
+    def resource_path(self, relative_path):
+        """ Get the absolute path to the resource, works for dev and for PyInstaller """
+        try:
+            # If using PyInstaller, sys._MEIPASS will be set to the temporary folder where files are extracted
+            base_path = sys._MEIPASS
+        except AttributeError:
+            # Otherwise, use the current directory
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
