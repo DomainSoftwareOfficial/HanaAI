@@ -1381,8 +1381,8 @@ class Record(ctk.CTk):
         self.monitor_folder()
 
         # Bind 'r' and 's' keys to start and stop actions
-        self.bind("<r>", lambda event: self.start_recording())
-        self.bind("<s>", lambda event: self.stop_recording())
+        self.bind("<7>", lambda event: self.start_recording())
+        self.bind("<8>", lambda event: self.stop_recording())
         self.focus_set()  # Set focus to the window to capture keypresses
 
         self.textbox.bind("<Return>", self.transcribe_and_process)
@@ -1396,7 +1396,7 @@ class Record(ctk.CTk):
             return
 
         # Determine the selected language
-        selected_language = self.get_selected_language()
+        selected_language = self.get_selected_language(input_text)
 
         # Transcribe the text based on the selected language
         translated_text = translate(input_text, selected_language)
