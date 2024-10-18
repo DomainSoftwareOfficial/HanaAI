@@ -1311,19 +1311,25 @@ class Stream(ctk.CTk):
 
 
 class Record(ctk.CTk):
-    def __init__(self, folder_path):
+    def __init__(self, selected_mic_index, folder_path, output_device_index=None):
         super().__init__()
         self.title("Record")
         self.geometry("600x400")
 
-        # Store the folder path
         self.folder_path = folder_path
+        self.sample_rate = 16000
+        self.selected_mic_index = selected_mic_index  # Store selected mic index
+        self.output_device_index = output_device_index  # Store the output device index
         self.current_files = []  # List to keep track of current files
+        self.current_file = None
 
         # Log and load the Whisper model
         self.fancy_log("🔄 ЗАГРУЗКА", "Загрузка Whisper Large Model...")
         self.model = whisper.load_model("large")  # Load Whisper large model
         self.fancy_log("✅ УСПЕШНО", "Whisper Large Model загружена.")
+
+        # Ensure the path for recorded audio is correctly defined here
+        self.recorded_audio_file = os.path.join(self.folder_path, "recorded_audio.wav")
 
         # Create a main frame to hold both the folder view and controls
         self.main_frame = ctk.CTkFrame(self)
@@ -1333,9 +1339,13 @@ class Record(ctk.CTk):
         self.folder_frame = ctk.CTkFrame(self.main_frame, width=200)
         self.folder_frame.pack(side="left", fill="y", padx=(0, 10))
 
-        # Create a Listbox to show folder contents
+        # Listbox for folder contents
         self.file_listbox = tk.Listbox(self.folder_frame, width=30, height=20)
         self.file_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+        self.load_folder_contents(self.folder_path)
+
+        # Bind the selection event for Listbox
+        self.file_listbox.bind("<<ListboxSelect>>", self.on_file_select)
 
         # Populate the listbox with folder contents
         self.load_folder_contents(self.folder_path)
@@ -1387,6 +1397,18 @@ class Record(ctk.CTk):
 
         self.textbox.bind("<Return>", self.transcribe_and_process)
 
+    def on_file_select(self, event):
+        """Play the selected file if it is an audio file."""
+        selected_index = self.file_listbox.curselection()
+        if selected_index:
+            selected_file = self.file_listbox.get(selected_index)
+            selected_file_path = os.path.join(self.folder_path, selected_file)
+
+            # Check if the selected file is a .wav audio file
+            if selected_file.lower().endswith('.wav'):
+                self.current_file = selected_file_path
+                self.play_audio()  # Play the selected audio file
+
     def transcribe_and_process(self, event):
         """Transcribe the text and process it."""
         # Get the text from the textbox
@@ -1433,6 +1455,8 @@ class Record(ctk.CTk):
                 # Clean up
                 self.clean_up_unwanted_files(audio_output_path, processed_audio_path)
 
+                self.current_file = final_audio_path
+
                 self.fancy_log("✅ УСПЕШНО", f"Файл сохранен как: {final_audio_path}")
             else:
                 self.fancy_log("⚠️ ВНИМАНИЕ", "Имя файла не введено. Аудиофайл не сохранен.")
@@ -1452,6 +1476,13 @@ class Record(ctk.CTk):
         
         # If none of the switches are selected, assume English by default
         return 'en'
+
+    def play_audio(self):
+        """Play the recorded or selected audio."""
+        if os.path.exists(self.current_file):
+            play(self.current_file, output_device_index=self.output_device_index)
+        else:
+            print("No recorded or selected audio file found.")
 
     def clean_up_unwanted_files(self, *files):
         """Remove or move unwanted audio files after processing."""
@@ -1489,60 +1520,56 @@ class Record(ctk.CTk):
         self.after(2000, self.monitor_folder)
 
     def start_recording(self):
-        """Start recording audio from the microphone."""
+        """Start recording using the selected microphone."""
         self.fancy_log("📹 НАЧАЛО ЗАПИСИ", "Запись началась...")
-        self.start_button.configure(state="disabled")  # Disable the start button
-        self.stop_button.configure(state="normal")  # Enable the stop button
-        
-        self.recorded_audio = []  # Clear any previous recordings
-        self.is_recording = True  # Set recording flag
-
-        # Start recording in a separate thread
+        self.is_recording = True
+        self.recorded_audio = []
         self.recording_thread = threading.Thread(target=self.record_audio)
         self.recording_thread.start()
 
-
     def record_audio(self):
-        """Capture audio data from the microphone."""
-        self.fancy_log("🔊 ЗАПИСЬ", "Говорите теперь...")
-        
+        """Capture audio data from the selected microphone."""
         while self.is_recording:
-            # Record 1 second of audio
-            audio_chunk = sd.rec(int(1 * self.sample_rate), samplerate=self.sample_rate, channels=1, dtype='float64')
-            sd.wait()  # Wait until the recording is finished
-            self.recorded_audio.append(audio_chunk)  # Append recorded chunk to the list
-
-
+            # Use the selected microphone index for recording
+            audio_chunk = sd.rec(int(1 * self.sample_rate), samplerate=self.sample_rate, 
+                                 channels=1, dtype='float64', device=self.selected_mic_index)
+            sd.wait()
+            self.recorded_audio.append(audio_chunk)
 
     def stop_recording(self):
-        """Stop recording audio and process it."""
-        self.fancy_log("🛑 ОСТАНОВКА ЗАПИСИ", "Запись остановлена.")
-        self.stop_button.configure(state="disabled")  # Disable the stop button
-        self.start_button.configure(state="normal")  # Enable the start button
+        """Stop recording and save the audio as a WAV file."""
+        self.is_recording = False
+        self.recording_thread.join()
 
-        self.is_recording = False  # Stop the recording loop
-        self.recording_thread.join()  # Wait for the thread to finish
-
-        # Convert recorded audio to numpy array
+        # Save audio to file
         recorded_audio_np = np.concatenate(self.recorded_audio, axis=0)
+        wavio.write(self.recorded_audio_file, recorded_audio_np, self.sample_rate, sampwidth=3)
 
-        # Save the recorded audio as a WAV file
-        audio_file_path = os.path.join(self.folder_path, "recorded_audio.wav")
-        wavio.write(audio_file_path, recorded_audio_np, self.sample_rate, sampwidth=3)
-
-        # Transcribe the recorded audio using Whisper
-        self.transcribe_audio(audio_file_path)
+        self.transcribe_audio(self.recorded_audio_file)
 
     def transcribe_audio(self, audio_file_path):
-        """Transcribe the recorded audio and display the text."""
-        self.fancy_log("📝 ТРАНСКРИПЦИЯ", "Транскрибируем аудио...")
-        # Use the Whisper model to transcribe the audio
+        """Transcribe the recorded audio and delete the file if the mic was used."""
         result = self.model.transcribe(audio_file_path)
         transcribed_text = result["text"]
 
-        # Display the transcribed text in the textbox
-        self.textbox.delete("1.0", tk.END)  # Clear the textbox
-        self.textbox.insert(tk.END, transcribed_text)  # Insert the transcribed text
+        # Display transcription
+        self.textbox.delete("1.0", tk.END)
+        self.textbox.insert(tk.END, transcribed_text)
+
+        # Check if the microphone was used (mic index is not None)
+        if self.selected_mic_index is not None:
+            self.delete_audio_file(audio_file_path)
+
+    def delete_audio_file(self, audio_file_path):
+        """Delete the recorded audio file if it exists."""
+        if os.path.exists(audio_file_path):
+            try:
+                os.remove(audio_file_path)
+                self.fancy_log("🗑️ УДАЛЕНО", f"Файл {audio_file_path} был успешно удалён.")
+            except OSError as e:
+                self.fancy_log("❌ ОШИБКА", f"Ошибка удаления файла: {e}")
+        else:
+            self.fancy_log("⚠️ ОШИБКА", f"Файл {audio_file_path} не найден.")
 
     def fancy_log(self, header, body, width=150):
         # Validate and convert width to integer

@@ -151,13 +151,29 @@ class StartWindow(ctk.CTk):
         # If "None" is selected, create a new folder
         if selected_audio_folder == "None":
             selected_audio_folder = self.create_random_folder(self.resource_path("../Assets/Audio"))
-        
-        print(f"Selected/Generated Audio Folder: {selected_audio_folder}")
+        else:
+            # Use the selected folder directly
+            selected_audio_folder = self.resource_path(f"../Assets/Audio/{selected_audio_folder}")
 
+        # Get selected microphone name and index
+        selected_mic_name = self.dropdown_var1.get()
+        selected_mic_index = next(
+            (idx for name, idx in self.microphones if name == selected_mic_name),
+            None
+        )
+
+        # Get selected output device name and index
+        selected_output_device_name = self.dropdown_var3.get()
+        selected_output_device_index = next(
+            (idx for name, idx in self.output_devices if name == selected_output_device_name),
+            None
+        )
+
+        # Pass the selected microphone, audio folder, and output device index to the Record window
         self.destroy()
-        record_window = Record(selected_audio_folder)
+        record_window = Record(selected_mic_index, selected_audio_folder, selected_output_device_index)
         record_window.mainloop()
-
+        
     def destroy(self):
         for after_id in self.after_ids:
             self.after_cancel(after_id)
