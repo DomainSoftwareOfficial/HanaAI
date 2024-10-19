@@ -30,6 +30,7 @@ def build():
         '--add-data', f'{WHISPER_PACKAGE}/normalizers/*.json;whisper/normalizers',
         '--add-data', f'{WHISPER_PACKAGE}/assets/*.npz;whisper/assets',
         '--add-data', f'{WHISPER_PACKAGE}/assets/*.tiktoken;whisper/assets',
+        '--additional-hooks-dir', os.path.join(CURRENT_DIR, 'Hooks'),
         os.path.join(APP_PATH, 'main.py')
     ]
 
