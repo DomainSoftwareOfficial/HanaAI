@@ -419,4 +419,3 @@ def play(file_path, output_device_index=None):
         
 if __name__ == "__main__":
     record_audio(output_file='../Assets/Audio/user.wav', mic_index=1, sample_rate=48000, chunk_size=1024, max_record_seconds=300)
-

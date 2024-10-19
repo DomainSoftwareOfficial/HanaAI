@@ -30,14 +30,17 @@ def build():
         '--add-data', f'{WHISPER_PACKAGE}/normalizers/*.json;whisper/normalizers',
         '--add-data', f'{WHISPER_PACKAGE}/assets/*.npz;whisper/assets',
         '--add-data', f'{WHISPER_PACKAGE}/assets/*.tiktoken;whisper/assets',
+        '--hidden-import', 'transformers.models.marian.modeling_marian',
+        '--exclude-module', 'torch.jit._overload',
         '--additional-hooks-dir', os.path.join(CURRENT_DIR, 'Hooks'),
         os.path.join(APP_PATH, 'main.py')
     ]
 
+    '''
     # Platform-specific options (e.g., Windows)
     if sys.platform == "win32":
         pyinstaller_command.append('--windowed')
-
+    '''
     try:
         # Run PyInstaller
         subprocess.run(pyinstaller_command, check=True)
