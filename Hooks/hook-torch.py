@@ -1,6 +1,6 @@
 # hook-torch.py
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 # Collect all the submodules of torch
 hiddenimports = collect_submodules('torch')

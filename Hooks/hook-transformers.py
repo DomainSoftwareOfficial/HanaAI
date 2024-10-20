@@ -1,7 +1,12 @@
-from PyInstaller.utils.hooks import copy_metadata, collect_data_files
+# ./Hooks/hook-transformers.py
 
-# Include any metadata and files for the transformers library
-datas = copy_metadata('transformers')
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-# Include the Marian model and other assets
-datas += collect_data_files('transformers', include_py_files=True)
+# Collect all the submodules of transformers
+hiddenimports = collect_submodules('transformers')
+
+# Collect all the data files needed for transformers, including config and model files
+datas = collect_data_files('transformers')
+
+# Collect data for specific submodules (if necessary, depending on your model)
+datas += collect_data_files('transformers.models.marian')
