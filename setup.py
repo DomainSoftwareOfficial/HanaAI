@@ -15,6 +15,7 @@ WHISPER_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'whisper')
 TORCH_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'torch')
 MARIAN_MODEL_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'transformers', 'models', 'marian')
 TRANSFORMERS_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'transformers')
+TQDM_PACKAGE = os.path.join(VENV_PATH, 'Lib', 'site-packages', 'tqdm')
 
 def build():
     
@@ -23,12 +24,14 @@ def build():
         '-m', 'PyInstaller',
         '--onefile',
         '--name', 'stream',
+        '--noconfirm',
         '--distpath', DIST_PATH,
         '--workpath', BUILD_PATH,
         '--specpath', SPEC_PATH,
         '--paths', APP_PATH,
         
         # Add required data and modules
+        '--add-data', f'{TQDM_PACKAGE};tqdm',
         '--add-data', f'{EMOJI_PACKAGE}/unicode_codes/*.json;emoji/unicode_codes',
         '--add-data', f'{TORCH_PACKAGE};torch',  # Simplify the pattern
         '--add-data', f'{MARIAN_MODEL_PACKAGE};transformers/models/marian',
@@ -41,6 +44,7 @@ def build():
         '--hidden-import', 'transformers.models.marian.modeling_marian',
         '--hidden-import', 'transformers.models.marian',
         '--hidden-import', 'transformers.utils',
+        '--hidden-import', 'tqdm',
         
         # Exclude the problematic overloads
         '--exclude-module', 'torch.jit._overload',
