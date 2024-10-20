@@ -505,6 +505,8 @@ class Stream(ctk.CTk):
             self.mic_thread = threading.Thread(target=self.start_recording_loop, daemon=True)
             self.mic_thread.start()
 
+            self.long_button.configure(text="Mic Off")
+
         else:
             # Stop the recording
             self.is_recording.clear()
@@ -516,6 +518,8 @@ class Stream(ctk.CTk):
 
             # Resume random_picker
             self.mic_pause_event.clear()
+
+            self.long_button.configure(text="Mic On")
 
     def start_recording_loop(self):
         self.fancy_log("🎤 Ожидание разрешения", "Ожидание начала записи с микрофона...")
@@ -589,7 +593,11 @@ class Stream(ctk.CTk):
 
                 try:
                     self.fancy_log("▶️ Воспроизведение аудио", "Воспроизводим обработанное аудио...")
-                    play(hana_output_path, self.selected_output_device_index)
+                    if os.getenv('Avatar-On') == 'True':
+                        with open(self.resource_path("../Data/Output/hana.txt"), "w", encoding='utf-8') as file:
+                            file.write("Аудио готово")
+                    else:
+                        play(hana_output_path, self.selected_output_device_index)
                     self.fancy_log("✅ Воспроизведение завершено", "Воспроизведение аудио завершено.")
                 except Exception as e:
                     self.fancy_log("❌ Ошибка", f"Ошибка при воспроизведении аудио: {e}", width=100)
@@ -801,20 +809,6 @@ class Stream(ctk.CTk):
         last_formatted_string = None  # Initialize the variable
 
         while not self.stop_random_picker.is_set():  # Check if the stop event is set
-            if self.mic_pause_event.is_set():
-                self.fancy_log("⏸️ Пауза", "random_picker приостановлен для записи с микрофона.")
-
-                # Set mic_start_flag to signal that recording can start
-                self.mic_start_flag.set()
-
-                # Wait until the pause_event is cleared before continuing
-                while self.mic_pause_event.is_set():
-                    time.sleep(0.1)
-
-                # Clear the mic_start_flag when random_picker resumes
-                self.mic_start_flag.clear()
-                self.fancy_log("▶️ Возобновление", "random_picker возобновлен.")
-
             # Check if superchat.chloe has content
             if os.path.exists(superchat_path):
                 with open(superchat_path, 'r', encoding='utf-8') as superchat_file:
@@ -835,6 +829,21 @@ class Stream(ctk.CTk):
                 self.fancy_log("⏸️  ОБРАБОТКА", "Выбор случайного значения приостановлен для обработки Chloe AI...")
                 while self.pause_event.is_set() and not self.stop_random_picker.is_set():
                     time.sleep(1)
+
+            if self.mic_pause_event.is_set():
+                self.fancy_log("⏸️ Пауза", "random_picker приостановлен для записи с микрофона.")
+
+                # Set mic_start_flag to signal that recording can start
+                self.mic_start_flag.set()
+
+                # Wait until the pause_event is cleared before continuing
+                while self.mic_pause_event.is_set():
+                    time.sleep(0.1)
+
+                # Clear the mic_start_flag when random_picker resumes
+                self.mic_start_flag.clear()
+                self.fancy_log("▶️ Возобновление", "random_picker возобновлен.")
+
 
             if self.cycle_active:
                 # Inside the cycle: 50/50 between monitor_file output or viewer input
