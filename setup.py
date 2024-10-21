@@ -39,17 +39,35 @@ def build():
         '--add-data', f'{WHISPER_PACKAGE}/normalizers/*.json;whisper/normalizers',
         '--add-data', f'{WHISPER_PACKAGE}/assets/*.npz;whisper/assets',
         '--add-data', f'{WHISPER_PACKAGE}/assets/*.tiktoken;whisper/assets',
-        
+
+        # Copy metadata for dependencies
+        '--copy-metadata', 'torch',
+        '--copy-metadata', 'tqdm',
+        '--copy-metadata', 'regex',
+        '--copy-metadata', 'sacremoses',
+        '--copy-metadata', 'requests',
+        '--copy-metadata', 'packaging',
+        '--copy-metadata', 'filelock',
+        '--copy-metadata', 'numpy',
+        '--copy-metadata', 'tokenizers',
+        '--copy-metadata', 'importlib_metadata',
+        '--copy-metadata', 'huggingface-hub',
+
         # Handle hidden imports
+        '--hidden-import', 'pytorch',
+        '--hidden-import', 'sklearn.utils._cython_blas',
+        '--hidden-import', 'sklearn.neighbors.typedefs',
+        '--hidden-import', 'sklearn.neighbors.quad_tree',
+        '--hidden-import', 'sklearn.tree',
+        '--hidden-import', 'sklearn.tree._utils',
         '--hidden-import', 'transformers.models.marian.modeling_marian',
         '--hidden-import', 'transformers.models.marian',
         '--hidden-import', 'transformers.utils',
-        '--hidden-import', 'tqdm',
-        
+
         # Exclude the problematic overloads
         '--exclude-module', 'torch.jit._overload',
-        '--exclude-module', 'torch.functional',   # Add this to exclude problematic functions
-        
+        '--exclude-module', 'torch.functional',
+
         '--additional-hooks-dir', os.path.join(CURRENT_DIR, 'Hooks'),
         os.path.join(APP_PATH, 'main.py')
     ]
