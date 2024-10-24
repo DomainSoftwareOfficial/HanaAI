@@ -1,12 +1,12 @@
-# ./Hooks/hook-transformers.py
+# hook-transformers.py
+# Скрипт для включения файлов и подмодулей из пакета transformers
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-# Collect all the submodules of transformers
-hiddenimports = collect_submodules('transformers')
-
-# Collect all the data files needed for transformers, including config and model files
+# Сбор моделей и дополнительных файлов из transformers
 datas = collect_data_files('transformers')
+datas += collect_data_files('huggingface_hub')
 
-# Collect data for specific submodules (if necessary, depending on your model)
-datas += collect_data_files('transformers.models.marian')
+# Сбор всех подмодулей transformers
+hiddenimports = collect_submodules('transformers')
+hiddenimports += collect_submodules('transformers.models')
