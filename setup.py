@@ -52,17 +52,22 @@ def build():
         '--copy-metadata', 'wavio',
         '--copy-metadata', 'filelock',
 
+        # Включение всех файлов и зависимостей для transformers и torch
+        '--collect-all', 'transformers',
+        '--collect-all', 'torch',
+        '--collect-all', 'torchvision',
+        '--collect-all', 'torchaudio',
+
         # Обработка скрытых импортов
         '--hidden-import', 'torchvision',
+        '--hidden-import', 'torchvision',
+        '--hidden-import', 'torch._jit_internal',
+        '--hidden-import', 'torch._C',
         '--hidden-import', 'sklearn.utils._cython_blas',
         '--hidden-import', 'sklearn.neighbors.typedefs',
         '--hidden-import', 'sklearn.neighbors.quad_tree',
         '--hidden-import', 'sklearn.tree',
         '--hidden-import', 'sklearn.tree._utils',
-
-        # Исключение проблемных модулей
-        '--exclude-module', 'torch.jit._overload',
-        '--exclude-module', 'torch.functional',
 
         # Дополнительные хуки
         '--additional-hooks-dir', os.path.join(CURRENT_DIR, 'Hooks'),
