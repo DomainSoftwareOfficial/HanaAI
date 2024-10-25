@@ -379,9 +379,56 @@ class Stream(ctk.CTk):
         self.pause_event = threading.Event()
         self.new_file_ready_event = threading.Event()
 
+
+        self.blacklist = []
+        self.open_blacklist_window()
+
         self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
         self.fancy_log("⚙️ ИНИЦИАЛИЗАЦИЯ", "Панель управления полностью инициализирована.")
+
+    def open_blacklist_window(self):
+        # Create a new window for the blacklist
+        self.blacklist_window = ctk.CTkToplevel(self)
+        self.blacklist_window.title("Add to Blacklist")
+        self.blacklist_window.geometry("400x250")  # Adjust size as needed
+
+        # Create a textbox with faded placeholder text
+        self.blacklist_entry = ctk.CTkEntry(self.blacklist_window, placeholder_text="Insert name to blacklist")
+        self.blacklist_entry.pack(pady=20, padx=10, fill="x")
+
+        # Create a button below the textbox with sharp corners
+        self.add_to_blacklist_button = ctk.CTkButton(
+            self.blacklist_window, 
+            text="Add to Blacklist", 
+            corner_radius=0,  # Sharp corners
+            command=self.add_to_blacklist
+        )
+        self.add_to_blacklist_button.pack(pady=10, padx=10, fill="x")
+
+        # Create a listbox to display blacklisted names
+        self.blacklist_listbox = tk.Listbox(self.blacklist_window, height=6, width=40)
+        self.blacklist_listbox.pack(pady=10, padx=10, fill="both")
+
+        # Populate the listbox with initial blacklist content
+        self.update_blacklist_display()
+
+    def update_blacklist_display(self):
+        # Clear and repopulate the listbox with updated blacklist names
+        self.blacklist_listbox.delete(0, tk.END)
+        for name in self.blacklist:
+            self.blacklist_listbox.insert(tk.END, name)
+
+    def add_to_blacklist(self):
+        # Get the text from the entry
+        name_to_blacklist = self.blacklist_entry.get().strip()  # Strip to remove extra whitespace
+
+        # Perform the blacklist addition logic here
+        if name_to_blacklist and name_to_blacklist not in self.blacklist:  # Avoid duplicates
+            self.blacklist.append(name_to_blacklist)  # Add name to the blacklist array
+            self.fancy_log("🔒 ЧЕРНЫЙ СПИСОК", f"{name_to_blacklist} добавлен в черный список.")
+            self.blacklist_entry.delete(0, "end")  # Clear the entry after adding
+            self.update_blacklist_display()  # Update the listbox to show the new blacklist content
 
     def safe_after(self, delay, func, *args, **kwargs):
         """
@@ -652,11 +699,11 @@ class Stream(ctk.CTk):
             self.fancy_log("❌ Ошибка", "Не запущен обработчик чата (не выбрано).")
 
         # Start random picker
+        self.fancy_log("▶️ Hana Запущен", "random_picker запущен.")
         self.stop_random_picker.clear()  # Clear the stop event before starting
         self.picker_thread = threading.Thread(target=self.random_picker, daemon=True)
         self.picker_thread.start()
         self.random_picker_running = True
-        self.fancy_log("▶️ Hana Запущен", "random_picker запущен.")
 
     
     def hana_stop(self):
@@ -670,7 +717,6 @@ class Stream(ctk.CTk):
         self.stop_random_picker.set()  # Signal the picker thread to stop
         self.random_picker_running = False
         self.fancy_log("⏹️ Случайный выбор", "Случайный выбор остановлен. Обработчики чата продолжают работать.")
-    
 
     def chloe_start(self):
         if self.monitor_file_running:
@@ -683,10 +729,11 @@ class Stream(ctk.CTk):
         self.stop_monitor_file.clear()  # Clear the stop event (make sure it's not set)
         self.pause_event.clear()        # Ensure the pause event is clear
         self.new_file_ready_event.clear()
+        self.fancy_log("📡 Chloe AI", "Мониторинг Chloe AI запущен")
         self.monitor_thread = threading.Thread(target=self.monitor_file, daemon=True)
         self.monitor_thread.start()     # Start the monitoring thread
         self.monitor_file_running = True
-        self.fancy_log("📡 Chloe AI", "Мониторинг Chloe AI запущен")
+        time.sleep(5)
 
     def chloe_stop(self):
         if not self.monitor_file_running:
@@ -864,6 +911,11 @@ class Stream(ctk.CTk):
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
 
+                    # Check for blacklisted viewer
+                    if viewer_text in self.blacklist:
+                        self.fancy_log("⛔ ЗАБЛОКИРОВАННЫЙ ЗРИТЕЛЬ", f"Пропуск ввода от заблокированного зрителя: '{viewer_text}'")
+                        time.sleep(5)
+                        continue  # Skip further processing and go to the next iteration
 
                     # Check if the modviewer file has content
                     with open(mod_file, 'r', encoding='utf-8') as modviewer_infile:
@@ -923,6 +975,12 @@ class Stream(ctk.CTk):
                     # Open the viewer files with UTF-8 encoding
                     with open(viewer_files[index], 'r', encoding='utf-8') as viewerfile:
                         viewer_text = viewerfile.read().strip()
+
+                    # Check for blacklisted viewer
+                    if viewer_text in self.blacklist:
+                        self.fancy_log("⛔ ЗАБЛОКИРОВАННЫЙ ЗРИТЕЛЬ", f"Пропуск ввода от заблокированного зрителя: '{viewer_text}'")
+                        time.sleep(5)
+                        continue  # Skip further processing and go to the next iteration
 
                     # Check if the modviewer file has content
                     with open(mod_file, 'r', encoding='utf-8') as modviewer_infile:
