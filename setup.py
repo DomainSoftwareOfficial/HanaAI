@@ -12,6 +12,9 @@ BUILD_PATH = os.path.join(CURRENT_DIR, 'Build')
 SPEC_PATH = os.path.join(CURRENT_DIR, 'Utilities', 'Miscellaneous')
 APP_PATH = os.path.join(CURRENT_DIR, 'App')
 
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ["TORCH_JIT"] = "0"
+
 def build():
     """
     Функция для выполнения сборки приложения с использованием PyInstaller.
@@ -51,24 +54,8 @@ def build():
         '--copy-metadata', 'Pillow',
         '--copy-metadata', 'wavio',
         '--copy-metadata', 'filelock',
-
-        # Включение всех файлов и зависимостей для transformers и torch
-        '--collect-all', 'transformers',
-        '--collect-all', 'torch',
-        '--collect-all', 'torchvision',
-        '--collect-all', 'torchaudio',
-
-        # Обработка скрытых импортов
-        '--hidden-import', 'torchvision',
-        '--hidden-import', 'torchvision',
-        '--hidden-import', 'torch._jit_internal',
-        '--hidden-import', 'torch._C',
-        '--hidden-import', 'sklearn.utils._cython_blas',
-        '--hidden-import', 'sklearn.neighbors.typedefs',
-        '--hidden-import', 'sklearn.neighbors.quad_tree',
-        '--hidden-import', 'sklearn.tree',
-        '--hidden-import', 'sklearn.tree._utils',
-
+        '--copy-metadata', 'packaging',
+        
         # Дополнительные хуки
         '--additional-hooks-dir', os.path.join(CURRENT_DIR, 'Hooks'),
 

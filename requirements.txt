@@ -39,3 +39,4 @@ pyinstaller
 Pillow
 wavio
 git+https://github.com/One-sixth/fairseq.git
+git+https://github.com/SWivid/F5-TTS.git
