@@ -89,11 +89,9 @@ class RAG:
             file.write(data)
 
 def resource_path(relative_path):
-    """ Get the absolute path to the resource, works for dev and for PyInstaller """
-    try:
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = os.path.abspath(".")
+    """Get path to resource relative to the executable's location."""
+    # Get the directory of the executable if frozen (PyInstaller), else use script location
+    base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
     return os.path.join(base_path, relative_path)
 
 def mainrag(search_query):

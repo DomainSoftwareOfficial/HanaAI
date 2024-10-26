@@ -72,8 +72,10 @@ class YouTubeChatHandler:
         self._stop_event.set()
 
     def resource_path(self, relative_path):
-        """ Get the absolute path to the resource, works for dev and for PyInstaller """
-        return os.path.join(self.base_path, relative_path)
+        """Get path to resource relative to the executable's location."""
+        # Get the directory of the executable if frozen (PyInstaller), else use script location
+        base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+        return os.path.join(base_path, relative_path)
 
 class TwitchChatHandler(twitch_commands.Bot):
     def __init__(self, token, client_id, nick, prefix, initial_channels, mod_names):
@@ -145,8 +147,10 @@ class TwitchChatHandler(twitch_commands.Bot):
         super().run()
 
     def resource_path(self, relative_path):
-        """ Get the absolute path to the resource, works for dev and for PyInstaller """
-        return os.path.join(self.base_path, relative_path)
+        """Get path to resource relative to the executable's location."""
+        # Get the directory of the executable if frozen (PyInstaller), else use script location
+        base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+        return os.path.join(base_path, relative_path)
 
         
 def youtube_chat():

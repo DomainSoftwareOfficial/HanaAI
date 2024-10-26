@@ -5,12 +5,10 @@ from datetime import datetime
 
 # Handle PyInstaller paths
 def resource_path(relative_path):
-    """ Get absolute path to resource, works for PyInstaller and normal execution. """
-    if hasattr(sys, '_MEIPASS'):
-        # Path when running under PyInstaller
-        return os.path.join(sys._MEIPASS, relative_path)
-    # Path when running normally
-    return os.path.join(os.path.abspath("."), relative_path)
+    """Get path to resource relative to the executable's location."""
+    # Get the directory of the executable if frozen (PyInstaller), else use script location
+    base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
 
 now_dir = os.getcwd()
 sys.path.append(now_dir)
