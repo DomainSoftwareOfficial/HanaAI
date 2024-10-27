@@ -20,7 +20,6 @@ def build():
     pyinstaller_command = [
         'pyInstaller',
         '--onefile',
-        '--windowed',
         '--name', 'stream',
         '--noconfirm',
         '--distpath', DIST_PATH,
