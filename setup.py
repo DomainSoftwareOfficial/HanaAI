@@ -12,9 +12,6 @@ BUILD_PATH = os.path.join(CURRENT_DIR, 'Build')
 SPEC_PATH = os.path.join(CURRENT_DIR, 'Utilities', 'Miscellaneous')
 APP_PATH = os.path.join(CURRENT_DIR, 'App')
 
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-os.environ["TORCH_JIT"] = "0"
-
 def build():
     """
     Функция для выполнения сборки приложения с использованием PyInstaller.
@@ -23,6 +20,7 @@ def build():
     pyinstaller_command = [
         'pyInstaller',
         '--onefile',
+        '--windowed',
         '--name', 'stream',
         '--noconfirm',
         '--distpath', DIST_PATH,
