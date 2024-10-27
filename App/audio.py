@@ -7,13 +7,11 @@ import pyaudio
 import wave
 import numpy as np
 from pydub import AudioSegment
-from pydub.playback import _play_with_simpleaudio
 import os
 import time
 from dotenv import load_dotenv
 from transformers import MarianMTModel, MarianTokenizer
 from langdetect import detect, DetectorFactory
-from langdetect.lang_detect_exception import LangDetectException
 import sounddevice as sd
 import soundfile as sf
 from datetime import datetime
