@@ -240,9 +240,13 @@ def tts(input_text, banned_words, language='en', banned_audio_path='../Assets/Au
         temp_output_path = os.path.join('../Assets/Audio', f'temp_segment_{i}.wav')  
         
         if is_banned:
+
+            banned_word_length = len(segment_text)
+            censor_duration = banned_word_length * 30  # Duration in milliseconds
+
             # Load banned audio file in the correct format and slice to 0.25 seconds
             banned_audio = AudioSegment.from_file(banned_audio_path, format=banned_audio_format)
-            sliced_banned_audio = banned_audio[banned_audio_offset:banned_audio_offset + 250]  # 250 ms from offset
+            sliced_banned_audio = banned_audio[banned_audio_offset:banned_audio_offset + censor_duration]  # Variable censor length
             audio_segments.append(sliced_banned_audio)  # Do not speed up banned audio
         else:
             # Use TTS for non-banned text segments

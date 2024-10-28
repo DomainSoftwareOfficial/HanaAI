@@ -11,6 +11,7 @@ import emoji
 import shutil
 import queue
 import re
+import json
 import unicodedata
 import sounddevice as sd
 import numpy as np
@@ -1437,7 +1438,7 @@ class Record(ctk.CTk):
         self.mp3_dropdown = ctk.CTkComboBox(self.controls_frame, values=self.mp3_files)
         self.mp3_dropdown.pack(pady=(10, 20), padx=20)  # Positioned below the buttons
 
-        self.banned_words = ["fuck", "dipshit"]
+        self.banned_words = os.getenv("BANNED_WORDS").split(",")
 
         # Slider for selecting a value from 0 to 1000
         self.slider = ctk.CTkSlider(self.controls_frame, from_=0, to=1000, command=self.on_slider_change)
