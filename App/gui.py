@@ -31,6 +31,7 @@ from audio import tts_en
 from audio import tts_es
 from audio import tts_ja
 from audio import tts_ru
+from audio import tts
 from rvc import mainrvc
 from audio import play
 from rag import mainrag
@@ -1410,9 +1411,6 @@ class Record(ctk.CTk):
         # Bind the selection event for Listbox
         self.file_listbox.bind("<<ListboxSelect>>", self.on_file_select)
 
-        # Populate the listbox with folder contents
-        self.load_folder_contents(self.folder_path)
-
         # Create a frame for the controls (right side)
         self.controls_frame = ctk.CTkFrame(self.main_frame, width=300)
         self.controls_frame.pack(side="right", fill="both", expand=True)
@@ -1432,6 +1430,20 @@ class Record(ctk.CTk):
         # Stop button
         self.stop_button = ctk.CTkButton(self.button_frame, text="Stop", width=140, command=self.stop_recording, corner_radius=0)
         self.stop_button.pack(side="right", padx=(5, 0))
+
+        # Dropdown for .mp3 files from ../Assets/Audio folder
+        self.audio_folder_path = "../Assets/Audio"
+        self.mp3_files = self.get_mp3_files()
+        self.mp3_dropdown = ctk.CTkComboBox(self.controls_frame, values=self.mp3_files)
+        self.mp3_dropdown.pack(pady=(10, 20), padx=20)  # Positioned below the buttons
+
+        self.banned_words = ["fuck", "dipshit"]
+
+        # Slider for selecting a value from 0 to 1000
+        self.slider = ctk.CTkSlider(self.controls_frame, from_=0, to=1000, command=self.on_slider_change)
+        self.slider.pack(pady=(10, 20), padx=20)  # Positioned below the dropdown
+        self.slider_label = ctk.CTkLabel(self.controls_frame, text="Slider Value: 500")
+        self.slider_label.pack()
 
         # Create a frame for the language switches and place it at the bottom of the controls frame
         self.switch_frame = ctk.CTkFrame(self.controls_frame)
@@ -1460,6 +1472,18 @@ class Record(ctk.CTk):
 
         self.textbox.bind("<Return>", self.transcribe_and_process)
 
+    def get_mp3_files(self):
+        """Fetches .mp3 files from the ../Assets/Audio directory."""
+        try:
+            return [f for f in os.listdir(self.audio_folder_path) if f.endswith('.mp3')]
+        except FileNotFoundError:
+            return []
+
+    def on_slider_change(self, value):
+        """Update the label and store slider value."""
+        self.slider_value = int(value)
+        self.slider_label.configure(text=f"Slider Value: {self.slider_value}")
+
     def on_file_select(self, event):
         """Play the selected file if it is an audio file."""
         selected_index = self.file_listbox.curselection()
@@ -1486,45 +1510,35 @@ class Record(ctk.CTk):
         # Transcribe the text based on the selected language
         translated_text = translate(input_text, selected_language)
 
-        # Generate audio based on the selected language
-        audio_output_path = os.path.join(self.folder_path, 'ai.wav')
-        if selected_language == 'en':
-            tts_en(translated_text, output_path=audio_output_path)
-        elif selected_language == 'ru':
-            tts_ru(translated_text, output_path=audio_output_path)
-        elif selected_language == 'es':
-            tts_es(translated_text, output_path=audio_output_path)
-        elif selected_language == 'ja':
-            tts_ja(translated_text, output_path=audio_output_path)
-        else:
-            self.fancy_log("⚠️ ВНИМАНИЕ", "Неверный язык выбран.")
+        # Get the banned audio path from the dropdown
+        banned_audio_path = os.path.join(self.audio_folder_path, self.mp3_dropdown.get())
+        if not banned_audio_path:
+            self.fancy_log("⚠️ ВНИМАНИЕ", "Выберите аудиофайл, который будет использоваться для запрещённых слов.")
             return
 
-        processed_audio_path = os.path.join(self.folder_path, 'processed.wav')
-        os.makedirs(os.path.dirname(processed_audio_path), exist_ok=True)  # Create the subdirectory if it doesn't exist
+        # Get the banned audio offset from the slider
+        banned_audio_offset = self.slider_value
 
-        # Call mainrvc to process the audio
-        mainrvc(audio_output_path, processed_audio_path)
-        shutil.move(self.resource_path('../Assets/Audio/processed.wav'), self.resource_path(f'{self.folder_path}/processed.wav'))
+        # Get the output path from user input
+        output_path = tk.simpledialog.askstring("Save File", "Введите имя файла для сохранения (без расширения):")
+        if not output_path:
+            self.fancy_log("⚠️ ВНИМАНИЕ", "Имя файла не введено. Аудиофайл не сохранен.")
+            return
+        output_path = os.path.join(self.folder_path, f"{output_path}.wav")
 
-        # Check if processed audio file exists before renaming
-        if os.path.exists(processed_audio_path):
-            # Prompt user for the filename to save the final audio
-            filename = tk.simpledialog.askstring("Save File", "Введите имя файла для сохранения (без расширения):")
-            if filename:
-                final_audio_path = os.path.join(self.folder_path, f"{filename}.wav")
-                os.rename(processed_audio_path, final_audio_path)  # Rename the processed file
+        # Call the tts function with required parameters
+        tts(
+            input_text=translated_text,
+            banned_words=self.banned_words,  # Assuming this is a class attribute
+            language=selected_language,
+            banned_audio_path=banned_audio_path,
+            output_path=output_path,
+            banned_audio_offset=banned_audio_offset
+        )
 
-                # Clean up
-                self.clean_up_unwanted_files(audio_output_path, processed_audio_path)
+        # You may want to implement additional processing here if needed
 
-                self.current_file = final_audio_path
-
-                self.fancy_log("✅ УСПЕШНО", f"Файл сохранен как: {final_audio_path}")
-            else:
-                self.fancy_log("⚠️ ВНИМАНИЕ", "Имя файла не введено. Аудиофайл не сохранен.")
-        else:
-            self.fancy_log("⚠️ ВНИМАНИЕ", f"Файл не найден: {processed_audio_path}. Проверьте, был ли он создан.")
+        self.fancy_log("✅ УСПЕШНО", f"Файл сохранен как: {output_path}")
 
     def get_selected_language(self, input_text):
         """Determine the selected language based on the switches."""

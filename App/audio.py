@@ -5,9 +5,11 @@ import numpy as np
 import librosa
 import pyaudio
 import wave
+import io
 import numpy as np
 from pydub import AudioSegment
 import os
+import re
 import time
 from dotenv import load_dotenv
 from transformers import MarianMTModel, MarianTokenizer
@@ -15,6 +17,7 @@ from langdetect import detect, DetectorFactory
 import sounddevice as sd
 import soundfile as sf
 from datetime import datetime
+from rvc import mainrvc
 # Mapping for supported languages and models
 
 load_dotenv()
@@ -183,6 +186,104 @@ def tts_ja(text, speed_up_factor=1.2, output_path='../Assets/Audio/ai.wav', gain
         
         # Save the adjusted audio to a file
         louder_audio.export(output_path, format='wav')
+
+
+def tts(input_text, banned_words, language='en', banned_audio_path='../Assets/Audio/quack.mp3', output_path='../Assets/Audio/hana.wav', banned_audio_offset=0, speed_up_factor=1.1, gain_dB=5):
+    """
+    Process text from a string by splitting between banned and non-banned words, generating audio segments
+    for each part, and combining them into a single audio file.
+    
+    Args:
+        input_text (str): The input text to process.
+        banned_words (list): List of banned words to identify and replace in text.
+        language (str): Language for TTS.
+        banned_audio_path (str): Path to the audio file used for banned words.
+        output_path (str): Final path to save the combined output audio.
+        banned_audio_offset (int): Start time (in milliseconds) for slicing the banned audio.
+        speed_up_factor (float): Factor to speed up the audio segments without pitch shift.
+        gain_dB (int): Decibel gain to increase the loudness of the output.
+    """
+    # Split input text into words, preserving words and handling connected characters
+    words = re.findall(r'\S+', input_text)  # This will include words and connected characters
+
+    current_text_segment = []
+    segments = []
+    audio_segments = []
+    temp_files = []
+
+    # Detect banned audio file format based on file extension
+    banned_audio_format = banned_audio_path.split('.')[-1]
+
+    # Split words into segments based on banned words
+    for word in words:
+        # Check if the banned word is part of the current word
+        is_banned = any(banned_word in word for banned_word in banned_words)
+        
+        if is_banned:
+            # If a non-banned segment is present, append it
+            if current_text_segment:
+                segments.append((' '.join(current_text_segment), False))
+                current_text_segment = []
+            # Append the original word with the banned content
+            segments.append((word, True))
+        else:
+            # Accumulate non-banned words
+            current_text_segment.append(word)
+
+    # Append the last segment if it contains non-banned words
+    if current_text_segment:
+        segments.append((' '.join(current_text_segment), False))
+
+    # Generate audio files for each segment
+    for i, (segment_text, is_banned) in enumerate(segments):
+        # Create temp file in the ../Assets/Audio directory
+        temp_output_path = os.path.join('../Assets/Audio', f'temp_segment_{i}.wav')  
+        
+        if is_banned:
+            # Load banned audio file in the correct format and slice to 0.25 seconds
+            banned_audio = AudioSegment.from_file(banned_audio_path, format=banned_audio_format)
+            sliced_banned_audio = banned_audio[banned_audio_offset:banned_audio_offset + 250]  # 250 ms from offset
+            audio_segments.append(sliced_banned_audio)  # Do not speed up banned audio
+        else:
+            # Use TTS for non-banned text segments
+            tts_audio = gTTS(text=segment_text, lang=language)
+            with io.BytesIO() as fp:
+                tts_audio.write_to_fp(fp)
+                fp.seek(0)
+                audio = AudioSegment.from_file(fp, format='mp3')
+                sped_up_audio = audio.speedup(playback_speed=speed_up_factor)  # Speed up the generated TTS audio
+                louder_audio = sped_up_audio + gain_dB  # Increase volume by specified gain
+                louder_audio.export(temp_output_path, format='wav')
+
+            # Run mainrvc on non-banned segments
+            mainrvc(temp_output_path, temp_output_path)  # mainrvc processes the file in ../Assets/Audio
+
+            # After processing, we need to move the file from ../Assets/Audio to the final output directory
+            final_temp_output_path = os.path.join(os.path.dirname(output_path), f'temp_segment_{i}.wav')
+            if os.path.exists(temp_output_path):
+                os.rename(temp_output_path, final_temp_output_path)  # Move to final directory
+            
+            # Reload the modified audio file after mainrvc processing
+            processed_audio = AudioSegment.from_file(final_temp_output_path, format='wav')
+            audio_segments.append(processed_audio.speedup(playback_speed=speed_up_factor) + gain_dB)  # Speed up processed audio and increase volume
+        
+        # Track the temporary file path for deletion
+        temp_files.append(final_temp_output_path)
+
+    # Combine all segments into a single audio file
+    combined_audio = sum(audio_segments)
+    
+    # Ensure the output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # Export the combined audio
+    combined_audio.export(output_path, format='wav')
+    
+    # Delete temporary segment files
+    for temp_file in temp_files:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+            
 
 # Function to convert pydub AudioSegment to numpy array for librosa
 def audiosegment_to_np(audio_segment):
@@ -416,4 +517,4 @@ def play(file_path, output_device_index=None):
 
         
 if __name__ == "__main__":
-    record_audio(output_file='../Assets/Audio/user.wav', mic_index=1, sample_rate=48000, chunk_size=1024, max_record_seconds=300)
+    ensure_models_downloaded()
