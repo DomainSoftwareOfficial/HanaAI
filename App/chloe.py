@@ -24,6 +24,7 @@ class CWindow(ctk.CTkToplevel):
         ctk.set_appearance_mode("dark")  # Тёмный режим
         ctk.set_default_color_theme("green")  # Зелёная тема
 
+        self.attributes("-topmost", True)
         # Создание фрейма для текстового поля и текста
         frame = ctk.CTkFrame(self)
         frame.pack(expand=True, fill="both", padx=10, pady=10)
@@ -66,6 +67,7 @@ class ImageGenerator(ctk.CTkToplevel):
         self.geometry("400x500")
         ctk.set_appearance_mode("dark")  # Dark mode
         ctk.set_default_color_theme("green")  # Green theme
+        self.attributes("-topmost", True)
 
         # Create status bar (initially red)
         self.status_bar = ctk.CTkLabel(self, text="Waiting for input", fg_color="red", height=30)

@@ -20,6 +20,7 @@ class HWindow(ctk.CTkToplevel):
         ctk.set_appearance_mode("dark")  # Dark mode
         ctk.set_default_color_theme("green")  # Green accent
 
+        self.attributes("-topmost", True)
         # Create a frame for the text box and text
         frame = ctk.CTkFrame(self)
         frame.pack(expand=True, fill="both", padx=10, pady=10)

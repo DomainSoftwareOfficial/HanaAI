@@ -134,6 +134,7 @@ class Stream(ctk.CTk):
         ctk.set_appearance_mode("dark")  # Dark mode
         ctk.set_default_color_theme("green")  # Green accent
 
+        self.attributes("-topmost", True)
         self.selected_mic_index = microphone_index
         self.selected_platform = selected_platform
         self.selected_output_device_index = output_device_index
@@ -394,6 +395,7 @@ class Stream(ctk.CTk):
         self.blacklist_window = ctk.CTkToplevel(self)
         self.blacklist_window.title("Add to Blacklist")
         self.blacklist_window.geometry("400x250")  # Adjust size as needed
+        self.blacklist_window.attributes("-topmost", True)
 
         # Create a textbox with faded placeholder text
         self.blacklist_entry = ctk.CTkEntry(self.blacklist_window, placeholder_text="Insert name to blacklist")
@@ -1379,8 +1381,10 @@ class Record(ctk.CTk):
     def __init__(self, selected_mic_index, folder_path, output_device_index=None):
         super().__init__()
         self.title("Record")
-        self.geometry("600x400")
+        self.geometry("600x450")
 
+
+        self.attributes("-topmost", True)
         self.folder_path = folder_path
         self.sample_rate = 16000
         self.selected_mic_index = selected_mic_index  # Store selected mic index
@@ -1445,6 +1449,11 @@ class Record(ctk.CTk):
         self.slider.pack(pady=(10, 20), padx=20)  # Positioned below the dropdown
         self.slider_label = ctk.CTkLabel(self.controls_frame, text="Slider Value: 500")
         self.slider_label.pack()
+
+        # Add a checkbox for enabling/disabling censoring
+        self.censor_checkbox = ctk.CTkCheckBox(self.controls_frame, text="Enable Censoring")
+        self.censor_checkbox.pack(pady=(10, 20), padx=20)  # Position below the language switches
+        self.censor_checkbox.select()  # Enable censoring by default
 
         # Create a frame for the language switches and place it at the bottom of the controls frame
         self.switch_frame = ctk.CTkFrame(self.controls_frame)
@@ -1527,6 +1536,8 @@ class Record(ctk.CTk):
             return
         output_path = os.path.join(self.folder_path, f"{output_path}.wav")
 
+        censor_enabled = self.censor_checkbox.get()
+
         # Call the tts function with required parameters
         tts(
             input_text=translated_text,
@@ -1534,7 +1545,8 @@ class Record(ctk.CTk):
             language=selected_language,
             banned_audio_path=banned_audio_path,
             output_path=output_path,
-            banned_audio_offset=banned_audio_offset
+            banned_audio_offset=banned_audio_offset,
+            censor_enabled=censor_enabled  # Pass censoring state
         )
 
         # You may want to implement additional processing here if needed

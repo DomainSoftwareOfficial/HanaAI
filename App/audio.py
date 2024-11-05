@@ -7,7 +7,7 @@ import pyaudio
 import wave
 import io
 import numpy as np
-from pydub import AudioSegment
+from pydub import AudioSegment, silence
 import os
 import re
 import time
@@ -188,7 +188,7 @@ def tts_ja(text, speed_up_factor=1.2, output_path='../Assets/Audio/ai.wav', gain
         louder_audio.export(output_path, format='wav')
 
 
-def tts(input_text, banned_words, language='en', banned_audio_path='../Assets/Audio/quack.mp3', output_path='../Assets/Audio/hana.wav', banned_audio_offset=0, speed_up_factor=1.1, gain_dB=5):
+def tts(input_text, banned_words, language='en', banned_audio_path='../Assets/Audio/quack.mp3', output_path='../Assets/Audio/hana.wav', banned_audio_offset=0, speed_up_factor=1.1, gain_dB=5, censor_enabled=True):
     """
     Process text from a string by splitting between banned and non-banned words, generating audio segments
     for each part, and combining them into a single audio file.
@@ -202,93 +202,91 @@ def tts(input_text, banned_words, language='en', banned_audio_path='../Assets/Au
         banned_audio_offset (int): Start time (in milliseconds) for slicing the banned audio.
         speed_up_factor (float): Factor to speed up the audio segments without pitch shift.
         gain_dB (int): Decibel gain to increase the loudness of the output.
+        censor_enabled (bool): Enable or disable censoring of banned words.
     """
-    # Split input text into words, preserving words and handling connected characters
-    words = re.findall(r'\S+', input_text)  # This will include words and connected characters
+    words = re.findall(r'\S+', input_text)  # Include words and connected characters
 
     current_text_segment = []
     segments = []
     audio_segments = []
     temp_files = []
 
-    # Detect banned audio file format based on file extension
     banned_audio_format = banned_audio_path.split('.')[-1]
 
-    # Split words into segments based on banned words
     for word in words:
-        # Check if the banned word is part of the current word
-        is_banned = any(banned_word in word for banned_word in banned_words)
+        is_banned = censor_enabled and any(banned_word in word for banned_word in banned_words)
         
         if is_banned:
-            # If a non-banned segment is present, append it
             if current_text_segment:
                 segments.append((' '.join(current_text_segment), False))
                 current_text_segment = []
-            # Append the original word with the banned content
             segments.append((word, True))
         else:
-            # Accumulate non-banned words
             current_text_segment.append(word)
 
-    # Append the last segment if it contains non-banned words
     if current_text_segment:
         segments.append((' '.join(current_text_segment), False))
 
-    # Generate audio files for each segment
     for i, (segment_text, is_banned) in enumerate(segments):
-        # Create temp file in the ../Assets/Audio directory
-        temp_output_path = os.path.join('../Assets/Audio', f'temp_segment_{i}.wav')  
+        temp_output_path = os.path.join('../Assets/Audio', f'temp_segment_{i}.wav')
         
         if is_banned:
-
-            banned_word_length = len(segment_text)
-            censor_duration = banned_word_length * 30  # Duration in milliseconds
-
-            # Load banned audio file in the correct format and slice to 0.25 seconds
             banned_audio = AudioSegment.from_file(banned_audio_path, format=banned_audio_format)
-            sliced_banned_audio = banned_audio[banned_audio_offset:banned_audio_offset + censor_duration]  # Variable censor length
-            audio_segments.append(sliced_banned_audio)  # Do not speed up banned audio
+            fixed_censor_duration = 300  # Fixed duration in milliseconds for the censor sound
+            sliced_banned_audio = banned_audio[banned_audio_offset:banned_audio_offset + fixed_censor_duration]
+            audio_segments.append(sliced_banned_audio)
         else:
-            # Use TTS for non-banned text segments
             tts_audio = gTTS(text=segment_text, lang=language)
             with io.BytesIO() as fp:
                 tts_audio.write_to_fp(fp)
                 fp.seek(0)
                 audio = AudioSegment.from_file(fp, format='mp3')
-                sped_up_audio = audio.speedup(playback_speed=speed_up_factor)  # Speed up the generated TTS audio
-                louder_audio = sped_up_audio + gain_dB  # Increase volume by specified gain
+                
+                # Detect and trim silence
+                silent_ranges = silence.detect_silence(audio, min_silence_len=100, silence_thresh=-50)
+                if silent_ranges:
+                    start_trim = silent_ranges[0][1] if silent_ranges[0][0] == 0 else 0
+                    end_trim = silent_ranges[-1][0] if silent_ranges[-1][1] == len(audio) else len(audio)
+                    trimmed_audio = audio[start_trim:end_trim]
+                else:
+                    trimmed_audio = audio
+                
+                # Speed up and amplify
+                sped_up_audio = trimmed_audio.speedup(playback_speed=speed_up_factor)
+                louder_audio = sped_up_audio + gain_dB
                 louder_audio.export(temp_output_path, format='wav')
-
-            # Run mainrvc on non-banned segments
-            mainrvc(temp_output_path, temp_output_path)  # mainrvc processes the file in ../Assets/Audio
-
-            # After processing, we need to move the file from ../Assets/Audio to the final output directory
+                
+            # Apply mainrvc processing
+            mainrvc(temp_output_path, temp_output_path)
+            
             final_temp_output_path = os.path.join(os.path.dirname(output_path), f'temp_segment_{i}.wav')
             if os.path.exists(temp_output_path):
-                os.rename(temp_output_path, final_temp_output_path)  # Move to final directory
+                os.rename(temp_output_path, final_temp_output_path)
             
-            # Reload the modified audio file after mainrvc processing
             processed_audio = AudioSegment.from_file(final_temp_output_path, format='wav')
-            audio_segments.append(processed_audio.speedup(playback_speed=speed_up_factor) + gain_dB)  # Speed up processed audio and increase volume
+            segment_audio = (processed_audio + gain_dB).speedup(playback_speed=speed_up_factor)
+            
+            # Check for punctuation and add silence if present
+            if segment_text[-1] in '.?!':
+                silence_duration = AudioSegment.silent(duration=300)  # 300 ms pause
+                segment_audio = segment_audio + silence_duration
+
+            audio_segments.append(segment_audio)
         
-        # Track the temporary file path for deletion
         temp_files.append(final_temp_output_path)
 
-    # Combine all segments into a single audio file
-    combined_audio = sum(audio_segments)
+    # Combine with crossfade
+    combined_audio = audio_segments[0]
+    for next_segment in audio_segments[1:]:
+        combined_audio = combined_audio.append(next_segment, crossfade=50)  # 50ms crossfade for smooth transitions
     
-    # Ensure the output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    # Export the combined audio
     combined_audio.export(output_path, format='wav')
     
-    # Delete temporary segment files
     for temp_file in temp_files:
         if os.path.exists(temp_file):
             os.remove(temp_file)
             
-
 # Function to convert pydub AudioSegment to numpy array for librosa
 def audiosegment_to_np(audio_segment):
     samples = np.array(audio_segment.get_array_of_samples())
