@@ -2,6 +2,7 @@ from gtts import gTTS
 from pydub import AudioSegment
 import io
 import numpy as np
+from scipy.io.wavfile import write
 import librosa
 import pyaudio
 import wave
@@ -353,6 +354,37 @@ def distort(speech_file_path, static_file_path, semitones=2, volume_reduction=0.
     combined.export(output_file_path, format="wav")
     log_debug(f"Аудио обработано и сохранено в {output_file_path}")
 
+def normalize(audio_path):
+    try:
+        # Load the audio file with librosa for processing
+        y, sr = librosa.load(audio_path, sr=None)
+
+        # Step 1: Noise Reduction - Trim silence or quiet sections
+        y_trimmed, _ = librosa.effects.trim(y)
+
+        # Step 2: Time Stretching - Speed up slightly without changing pitch
+        y_stretched = librosa.effects.time_stretch(y_trimmed, rate=1.1)
+
+        # Convert the processed numpy array back to an audio segment for filtering adjustments
+        temp_output_path = "temp_normalized.wav"
+        write(temp_output_path, sr, (y_stretched * 32767).astype(np.int16))
+        
+        # Reload as AudioSegment for balanced filtering
+        processed_audio = AudioSegment.from_file(temp_output_path)
+
+        # Step 3: Balanced Filtering - Apply both low-pass and high-pass filters
+        filtered_audio = processed_audio.low_pass_filter(5000)  # Keep frequencies below 5000 Hz
+        filtered_audio = filtered_audio.high_pass_filter(100)    # Keep frequencies above 100 Hz
+
+        # Final output path (overwrite original file)
+        filtered_audio.export(audio_path, format="wav")
+        print(f"Processed audio saved to the same path: {audio_path}")
+        
+        # Remove the temporary file
+        os.remove(temp_output_path)
+    
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 def list_microphones():
     microphones = []
@@ -519,4 +551,4 @@ def play(file_path, output_device_index=None):
 
         
 if __name__ == "__main__":
-    ensure_models_downloaded()
+    normalize('../Assets/Audio/hana.wav')

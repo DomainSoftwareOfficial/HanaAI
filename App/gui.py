@@ -28,6 +28,7 @@ from chat import TwitchChatHandler
 from audio import translate
 from audio import record_audio
 from audio import distort
+from audio import normalize
 from audio import tts_en
 from audio import tts_es
 from audio import tts_ja
@@ -1064,6 +1065,7 @@ class Stream(ctk.CTk):
                     # Process the audio file with mainrvc and save as hana.wav
                     hana_output_path = self.resource_path('../Assets/Audio/hana.wav')
                     mainrvc(ai_output_path, hana_output_path)
+                    normalize(hana_output_path)
 
                     if os.getenv('Avatar-On') == 'True':
                         with open(self.resource_path("../Data/Output/hana.txt"), "w", encoding='utf-8') as file:
