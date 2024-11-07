@@ -129,7 +129,7 @@ class Stream(ctk.CTk):
         self.after_ids = []
         self.fancy_log("⚙️ ИНИЦИАЛИЗАЦИЯ", "Запуск Панели Управления...")
 
-        self.title("Chat Control Panel")
+        self.title("Stream Control Panel")
         self.geometry("640x800")  # Increased height to accommodate the new layout
         ctk.set_appearance_mode("dark")  # Dark mode
         ctk.set_default_color_theme("green")  # Green accent
@@ -393,7 +393,7 @@ class Stream(ctk.CTk):
     def open_blacklist_window(self):
         # Create a new window for the blacklist
         self.blacklist_window = ctk.CTkToplevel(self)
-        self.blacklist_window.title("Add to Blacklist")
+        self.blacklist_window.title("Blacklist Control Panel")
         self.blacklist_window.geometry("400x250")  # Adjust size as needed
         self.blacklist_window.attributes("-topmost", True)
 
@@ -1380,7 +1380,7 @@ class Stream(ctk.CTk):
 class Record(ctk.CTk):
     def __init__(self, selected_mic_index, folder_path, output_device_index=None):
         super().__init__()
-        self.title("Record")
+        self.title("Интерфейс записи")
         self.geometry("600x450")
 
 
@@ -1429,11 +1429,11 @@ class Record(ctk.CTk):
         self.button_frame.pack(pady=10, padx=20)
 
         # Start button
-        self.start_button = ctk.CTkButton(self.button_frame, text="Start", width=140, command=self.start_recording, corner_radius=0)
+        self.start_button = ctk.CTkButton(self.button_frame, text="Начать запись", width=140, command=self.start_recording, corner_radius=0)
         self.start_button.pack(side="left", padx=(0, 5))
 
         # Stop button
-        self.stop_button = ctk.CTkButton(self.button_frame, text="Stop", width=140, command=self.stop_recording, corner_radius=0)
+        self.stop_button = ctk.CTkButton(self.button_frame, text="Остановить запись", width=140, command=self.stop_recording, corner_radius=0)
         self.stop_button.pack(side="right", padx=(5, 0))
 
         # Dropdown for .mp3 files from ../Assets/Audio folder
@@ -1447,11 +1447,11 @@ class Record(ctk.CTk):
         # Slider for selecting a value from 0 to 1000
         self.slider = ctk.CTkSlider(self.controls_frame, from_=0, to=1000, command=self.on_slider_change)
         self.slider.pack(pady=(10, 20), padx=20)  # Positioned below the dropdown
-        self.slider_label = ctk.CTkLabel(self.controls_frame, text="Slider Value: 500")
+        self.slider_label = ctk.CTkLabel(self.controls_frame, text="Значение смещения: 500")
         self.slider_label.pack()
 
         # Add a checkbox for enabling/disabling censoring
-        self.censor_checkbox = ctk.CTkCheckBox(self.controls_frame, text="Enable Censoring")
+        self.censor_checkbox = ctk.CTkCheckBox(self.controls_frame, text="Цензура?")
         self.censor_checkbox.pack(pady=(10, 20), padx=20)  # Position below the language switches
         self.censor_checkbox.select()  # Enable censoring by default
 
@@ -1492,7 +1492,7 @@ class Record(ctk.CTk):
     def on_slider_change(self, value):
         """Update the label and store slider value."""
         self.slider_value = int(value)
-        self.slider_label.configure(text=f"Slider Value: {self.slider_value}")
+        self.slider_label.configure(text=f"Значение смещения: {self.slider_value}")
 
     def on_file_select(self, event):
         """Play the selected file if it is an audio file."""
