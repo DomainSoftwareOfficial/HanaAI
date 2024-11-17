@@ -22,7 +22,7 @@ from chloe import CWindow
 from hana import HWindow
 from hana import hana_ai
 from chloe import chloe_ai
-from chloe import ImageGenerator
+from kaito import ImageGenerator
 from chat import YouTubeChatHandler
 from chat import TwitchChatHandler
 from audio import translate
@@ -1349,11 +1349,11 @@ class Stream(ctk.CTk):
         sys.stdout.flush()
 
     def open_window1(self):
-        self.chloe_window = CWindow()
+        self.chloe_window = CWindow(self)
         self.chloe_window.mainloop()
 
     def open_window2(self):
-        self.hana_window = HWindow(self)  # Pass the reference of App to HWindow
+        self.hana_window = HWindow(self)
         self.hana_window.mainloop()
 
     def on_main_window_close(self):
