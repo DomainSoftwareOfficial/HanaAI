@@ -259,6 +259,7 @@ def tts(input_text, banned_words, language='en', banned_audio_path='../Assets/Au
                 
             # Apply mainrvc processing
             mainrvc(temp_output_path, temp_output_path)
+            normalize(temp_output_path)
             
             final_temp_output_path = os.path.join(os.path.dirname(output_path), f'temp_segment_{i}.wav')
             if os.path.exists(temp_output_path):
