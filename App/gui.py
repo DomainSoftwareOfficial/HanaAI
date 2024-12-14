@@ -20,9 +20,12 @@ from datetime import datetime
 from dotenv import load_dotenv
 from chloe import CWindow
 from hana import HWindow
+from hana import Ranting
+from hana import Reading
 from hana import hana_ai
+from hana import automata_ai
 from chloe import chloe_ai
-from kaito import ImageGenerator
+from chloe import ImageGenerator
 from chat import YouTubeChatHandler
 from chat import TwitchChatHandler
 from audio import translate
@@ -386,6 +389,7 @@ class Stream(ctk.CTk):
 
         self.blacklist = []
         self.open_blacklist_window()
+        self.simulate_chat()
 
         self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
@@ -417,6 +421,26 @@ class Stream(ctk.CTk):
 
         # Populate the listbox with initial blacklist content
         self.update_blacklist_display()
+
+    def simulate_chat(self):
+        # Create a new window for the chat simulation
+        self.chat_simulation_window = ctk.CTkToplevel(self)
+        self.chat_simulation_window.title("Simulate Chat")
+        self.chat_simulation_window.geometry("400x125")  # Set window size
+        self.chat_simulation_window.attributes("-topmost", True)
+
+        # Create a frame to organize slider and checkbox side by side
+        frame = ctk.CTkFrame(self.chat_simulation_window)
+        frame.pack(pady=20, padx=20, fill="both", expand=True)
+
+        # Add a slider to the frame
+        self.simulation_slider = ctk.CTkSlider(frame, from_=0, to=100)  # Slider from 0 to 100
+        self.simulation_slider.pack(side="left", padx=10, pady=10, fill="x", expand=True)
+
+        # Add a checkbox next to the slider
+        self.simulation_checkbox = ctk.CTkCheckBox(frame, text="Enable")
+        self.simulation_checkbox.pack(side="left", padx=10, pady=10)
+
 
     def update_blacklist_display(self):
         # Clear and repopulate the listbox with updated blacklist names
@@ -1069,7 +1093,7 @@ class Stream(ctk.CTk):
 
                     if os.getenv('Avatar-On') == 'True':
                         with open(self.resource_path("../Data/Output/hana.txt"), "w", encoding='utf-8') as file:
-                            file.write("Аудио готово")
+                            file.write(automata_ai(processed_string, self.llm_model))
                     else:
                         play(hana_output_path, self.selected_output_device_index)
 
@@ -1378,13 +1402,11 @@ class Stream(ctk.CTk):
             self.after_cancel(self.after_id)
         super().destroy()
 
-
 class Record(ctk.CTk):
     def __init__(self, selected_mic_index, folder_path, output_device_index=None):
         super().__init__()
         self.title("Интерфейс записи")
-        self.geometry("600x450")
-
+        self.geometry("600x400")
 
         self.attributes("-topmost", True)
         self.folder_path = folder_path
@@ -1393,6 +1415,8 @@ class Record(ctk.CTk):
         self.output_device_index = output_device_index  # Store the output device index
         self.current_files = []  # List to keep track of current files
         self.current_file = None
+        self.ranting_window = None
+        self.reading_window = None
 
         # Log and load the Whisper model
         self.fancy_log("🔄 ЗАГРУЗКА", "Загрузка Whisper Large Model...")
@@ -1411,12 +1435,19 @@ class Record(ctk.CTk):
         self.folder_frame.pack(side="left", fill="y", padx=(0, 10))
 
         # Listbox for folder contents
-        self.file_listbox = tk.Listbox(self.folder_frame, width=30, height=20)
-        self.file_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+        self.file_listbox = tk.Listbox(self.folder_frame, width=30, height=10)
+        self.file_listbox.pack(fill="x", padx=5, pady=5)
         self.load_folder_contents(self.folder_path)
 
         # Bind the selection event for Listbox
         self.file_listbox.bind("<<ListboxSelect>>", self.on_file_select)
+
+        # Textbox for displaying the fixed file's content (below the file list)
+        self.fixed_textbox = ctk.CTkTextbox(self.folder_frame, height=10, width=30, wrap="word")
+        self.fixed_textbox.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Load the fixed text file contents
+        self.load_fixed_text_file()
 
         # Create a frame for the controls (right side)
         self.controls_frame = ctk.CTkFrame(self.main_frame, width=300)
@@ -1438,24 +1469,40 @@ class Record(ctk.CTk):
         self.stop_button = ctk.CTkButton(self.button_frame, text="Остановить запись", width=140, command=self.stop_recording, corner_radius=0)
         self.stop_button.pack(side="right", padx=(5, 0))
 
-        # Dropdown for .mp3 files from ../Assets/Audio folder
+        # Create a frame to hold the slider value and dropdown horizontally
+        self.number_dropdown_frame = ctk.CTkFrame(self.controls_frame)
+        self.number_dropdown_frame.pack(fill="x", pady=(10, 20), padx=20)
+
+        # Label to display the slider value (on the left)
+        self.slider_value_label = ctk.CTkLabel(
+            self.number_dropdown_frame,
+            text="500",  # Default value
+            width=50,  # Fixed width for consistency
+            anchor="e"  # Align text to the right
+        )
+        self.slider_value_label.pack(side="left", padx=(0, 10))
+
+        # Dropdown for .mp3 files (on the right of the slider value)
         self.audio_folder_path = "../Assets/Audio"
         self.mp3_files = self.get_mp3_files()
-        self.mp3_dropdown = ctk.CTkComboBox(self.controls_frame, values=self.mp3_files)
-        self.mp3_dropdown.pack(pady=(10, 20), padx=20)  # Positioned below the buttons
+        self.mp3_dropdown = ctk.CTkComboBox(
+            self.number_dropdown_frame,
+            values=self.mp3_files,
+            fg_color="green"  # Background color for the dropdown
+        )
+        self.mp3_dropdown.pack(side="right", fill="x", expand=True)
 
         self.banned_words = os.getenv("BANNED_WORDS").split(",")
 
         # Slider for selecting a value from 0 to 1000
-        self.slider = ctk.CTkSlider(self.controls_frame, from_=0, to=1000, command=self.on_slider_change)
-        self.slider.pack(pady=(10, 20), padx=20)  # Positioned below the dropdown
-        self.slider_label = ctk.CTkLabel(self.controls_frame, text="Значение смещения: 500")
-        self.slider_label.pack()
-
-        # Add a checkbox for enabling/disabling censoring
-        self.censor_checkbox = ctk.CTkCheckBox(self.controls_frame, text="Цензура?")
-        self.censor_checkbox.pack(pady=(10, 20), padx=20)  # Position below the language switches
-        self.censor_checkbox.select()  # Enable censoring by default
+        self.slider = ctk.CTkSlider(
+            self.controls_frame,
+            from_=0,
+            to=1000,
+            command=self.on_slider_change
+        )
+        self.slider.set(500)  # Set default slider value
+        self.slider.pack(pady=(10, 20), padx=20)
 
         # Create a frame for the language switches and place it at the bottom of the controls frame
         self.switch_frame = ctk.CTkFrame(self.controls_frame)
@@ -1484,6 +1531,43 @@ class Record(ctk.CTk):
 
         self.textbox.bind("<Return>", self.transcribe_and_process)
 
+        self.open_ranting_window()
+
+    def open_ranting_window(self):
+        """Open the Ranting window and trigger Reading window."""
+        if self.ranting_window is None or not self.ranting_window.winfo_exists():
+            self.ranting_window = Ranting(self)
+            self.ranting_window.protocol("WM_DELETE_WINDOW", self.cleanup_ranting_window)
+            self.open_reading_window()  # Open the Reading window
+        else:
+            self.ranting_window.focus()
+
+    def cleanup_ranting_window(self):
+        """Handle cleanup when the Ranting window is closed."""
+        if self.ranting_window:
+            self.ranting_window.destroy()
+        self.ranting_window = None
+
+    def open_reading_window(self):
+        """Open the Reading window."""
+        if self.reading_window is None or not self.reading_window.winfo_exists():
+            self.reading_window = Reading(self)
+        else:
+            self.reading_window.focus()
+
+    def load_fixed_text_file(self):
+        """Load and display the contents of a fixed text file in the textbox."""
+        fixed_file_path = self.resource_path("../Data/Input/timings.txt")
+        try:
+            with open(fixed_file_path, "r", encoding="utf-8") as file:
+                content = file.read()
+                self.fixed_textbox.delete("1.0", tk.END)  # Clear existing content
+                self.fixed_textbox.insert("1.0", content)  # Insert new content
+        except FileNotFoundError:
+            self.fixed_textbox.insert("1.0", "Error: Fixed text file not found.")
+        except Exception as e:
+            self.fixed_textbox.insert("1.0", f"Error loading file: {str(e)}")
+
     def get_mp3_files(self):
         """Fetches .mp3 files from the ../Assets/Audio directory."""
         try:
@@ -1492,9 +1576,10 @@ class Record(ctk.CTk):
             return []
 
     def on_slider_change(self, value):
-        """Update the label and store slider value."""
+        """Update the label and toggle censoring based on slider value."""
         self.slider_value = int(value)
-        self.slider_label.configure(text=f"Значение смещения: {self.slider_value}")
+        self.slider_value_label.configure(text=f"{self.slider_value}")
+        self.censoring = self.slider_value != 1000
 
     def on_file_select(self, event):
         """Play the selected file if it is an audio file."""
@@ -1538,7 +1623,12 @@ class Record(ctk.CTk):
             return
         output_path = os.path.join(self.folder_path, f"{output_path}.wav")
 
-        censor_enabled = self.censor_checkbox.get()
+        censor_enabled = self.censoring  # Use the updated censoring state
+
+        if censor_enabled:
+            self.fancy_log("✅ Обработка", "Цензура активирована для текста.")
+        else:
+            self.fancy_log("🚫 Обработка", "Цензура отключена для текста.")
 
         # Call the tts function with required parameters
         tts(

@@ -10,6 +10,137 @@ import json
 from datetime import datetime
 import time
 
+class Ranting(ctk.CTkToplevel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.title("Вторичное окно")
+        self.geometry("400x300")  # Window dimensions
+        self.protocol("WM_DELETE_WINDOW", self.cleanup)  # Cleanup on close
+
+        self.log_debug("Открыто вторичное окно.", width=150)
+
+        # Top Textbox with round corners
+        self.top_textbox = ctk.CTkTextbox(self, height=70, corner_radius=10)
+        self.top_textbox.pack(fill="x", padx=10, pady=(10, 5))
+        self.top_textbox.insert("1.0", "Введите текст сюда...")
+        self.log_debug("Создан текстовый виджет для ввода текста.", width=150)
+
+        # Middle Row
+        middle_frame = ctk.CTkFrame(self)
+        middle_frame.pack(fill="x", padx=10, pady=5)
+
+        # Textbox in the middle with sharp corners and adjusted height
+        self.middle_textbox = ctk.CTkTextbox(
+            middle_frame, width=60, height=50, corner_radius=0
+        )
+        self.middle_textbox.pack(side="left", padx=(0, 5))
+        self.middle_textbox.insert("1.0", "0")
+
+        # Frame for increment and decrement buttons
+        button_frame = ctk.CTkFrame(middle_frame)
+        button_frame.pack(side="left", padx=(0, 5))
+
+        # Increment/Decrement buttons stacked vertically
+        ctk.CTkButton(
+            button_frame, text="+", width=20, height=20, corner_radius=0, command=self.increment_value
+        ).pack(pady=(0, 5))
+        ctk.CTkButton(
+            button_frame, text="-", width=20, height=20, corner_radius=0, command=self.decrement_value
+        ).pack()
+
+        # Submit button
+        submit_button = ctk.CTkButton(
+            middle_frame, text="Submit", height=50, corner_radius=0, command=self.on_submit
+        )
+        submit_button.pack(side="left", fill="x", expand=True, padx=(5, 0))
+
+        # Bottom Row
+        bottom_frame = ctk.CTkFrame(self, height=50)  # Explicitly set height for the section
+        bottom_frame.pack(fill="x", padx=10, pady=10)  # No expand=True, maintain original height
+
+        self.bottom_textboxes = []
+        for i in range(4):
+            tb = ctk.CTkTextbox(bottom_frame, width=85, height=30, corner_radius=0)
+            tb.pack(side="left", padx=5, pady=(10, 10))  # Add equal padding for vertical centering within the fixed height
+            tb.insert("1.0", "Текст")
+            self.bottom_textboxes.append(tb)
+
+    def log_debug(self, message, width=150):
+        """Logs debug messages with Russian truncation support."""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        prefix = f"{timestamp} | INFO | "
+        available_width = width - len(prefix)
+        if len(message) > available_width:
+            message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
+        print(f"{prefix}{message}")
+
+    def on_submit(self):
+        """Handle the Submit button click."""
+        value = self.middle_textbox.get("1.0", "end-1c").strip()
+        self.log_debug(f"Submitted value: {value}", width=150)
+
+    def increment_value(self):
+        """Increment the number in the middle textbox."""
+        value = int(self.middle_textbox.get("1.0", "end-1c").strip())
+        self.update_middle_textbox(value + 1)
+
+    def decrement_value(self):
+        """Decrement the number in the middle textbox."""
+        value = int(self.middle_textbox.get("1.0", "end-1c").strip())
+        self.update_middle_textbox(value - 1)
+
+    def update_middle_textbox(self, value):
+        """Update the value in the middle textbox."""
+        self.middle_textbox.delete("1.0", "end")
+        self.middle_textbox.insert("1.0", str(value))
+
+    def cleanup(self):
+        """Handle cleanup before window is destroyed."""
+        self.destroy()
+
+class Reading(ctk.CTkToplevel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.title("Reading Window")
+        self.geometry("400x300")
+        self.protocol("WM_DELETE_WINDOW", self.cleanup)
+
+        # Top Textbox with rounded corners (height adjusted to match Ranting's top row)
+        self.top_textbox = ctk.CTkTextbox(self, height=70, corner_radius=10)
+        self.top_textbox.pack(fill="x", padx=10, pady=(10, 5))
+        self.top_textbox.insert("1.0", "Enter text here...")
+
+        # Middle Row with two equal-width buttons
+        middle_frame = ctk.CTkFrame(self, height=50)  # Match height to button height
+        middle_frame.pack(fill="x", padx=10, pady=5)
+
+        # Two buttons of equal width (matching Ranting's layout)
+        button_width = (400 - 30) / 2  # Subtracting padding from the window width
+        self.button_1 = ctk.CTkButton(
+            middle_frame, text="Button 1", width=button_width, height=50, corner_radius=0
+        )
+        self.button_1.pack(side="left", padx=(0, 5), pady=0)  # Remove additional padding to align with frame
+
+        self.button_2 = ctk.CTkButton(
+            middle_frame, text="Button 2", width=button_width, height=50, corner_radius=0
+        )
+        self.button_2.pack(side="right", padx=(5, 0), pady=0)
+
+        # Bottom Row with textboxes (height adjusted to match Ranting's bottom row)
+        bottom_frame = ctk.CTkFrame(self, height=50)  # Fixed height for the section
+        bottom_frame.pack(fill="x", padx=10, pady=10)
+
+        self.bottom_textboxes = []
+        for i in range(4):
+            tb = ctk.CTkTextbox(bottom_frame, width=85, height=30, corner_radius=0)
+            tb.pack(side="left", padx=5, pady=(10, 10))  # Equal padding for vertical centering
+            tb.insert("1.0", "Текст")
+            self.bottom_textboxes.append(tb)
+
+    def cleanup(self):
+        """Handle cleanup before window is destroyed."""
+        self.destroy()
+
 class HWindow(ctk.CTkToplevel):
     def __init__(self, app):
         super().__init__()
@@ -175,6 +306,124 @@ def hana_ai(input_text, model=None):
     except Exception as e:
         log_debug(f"Ошибка подключения к WebUI: {e}")
         return "WebUI connection error."
+
+def automata_ai(input_text, model=None):
+    """Automata logic to handle both local GGUF model and fallback to WebUI."""
+
+    def log_debug(message, width=150):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Prepare the log prefix (timestamp + INFO label)
+        prefix = f"{timestamp} | INFO | "
+        
+        # Calculate the available width for the message (subtract prefix length from total width)
+        available_width = width - len(prefix)
+
+        # If the message is too long, truncate it and add ...{hidden}
+        if len(message) > available_width:
+            message = message[:available_width - len("...{скрытый}")] + "...{скрытый}"
+
+        # Print the final log message with the prefix
+        print(f"{prefix}{message}")
+
+    def remove_invalid_bytes(data):
+        """Remove byte sequences represented as <0x..>."""
+        return re.sub(r'<0x[0-9A-Fa-f]{1,2}>', '', data)
+
+    log_debug("Запуск обработки Automata AI...")
+
+    # Load environment variables (e.g., WebUI URL)
+    load_dotenv()
+    log_debug("Переменные окружения загружены.")
+
+    chat_set = os.getenv('Instruction-Set')
+
+    # Use resource_path to access files with PyInstaller compatibility
+    instructions_path = resource_path("../Data/Input/profile.automata")
+
+    log_debug(f"Чтение файлов ввода: {instructions_path}")
+
+    # Ensure files are read with UTF-8 encoding
+    with open(instructions_path, "r", encoding='utf-8') as file:
+        instructions = file.read()
+
+    # Split the instructions into two parts: the first four lines and the rest
+    instructions_lines = instructions.splitlines()
+    instructions_pt1 = "\n".join(instructions_lines[:4])  # First four lines
+    instructions_pt2 = "\n".join(instructions_lines[4:])  # The rest
+
+    log_debug("Файлы успешно прочитаны.")
+
+    if chat_set == 'Alpaca':
+        prompt = f"{instructions_pt1}\n{instructions_pt2}\nHana Busujima: {input_text}\n\n### Response:\nAutomata:"
+    elif chat_set == 'ChatML':
+        prompt = f"{instructions_pt1}\n{instructions_pt2}\nHana Busujima: {input_text}<|im_end|>\n<|im_start|>assistant\nAutomata:"
+
+    log_debug(f"Сгенерирована подсказка с использованием {chat_set} набора инструкций.")
+
+    # Check if a model is provided, use it; otherwise, fallback to WebUI
+    if model is not None:
+        log_debug("Предоставлена локальная модель GGUF. Использование локальной модели.")
+        try:
+            start_time = time.time()
+            response = model(prompt, max_tokens=512, temperature=0.6, top_p=0.8, top_k=50)  # Adjust as needed
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+
+            # Process the response
+            new_result = response['choices'][0]['text'].replace("\n", "")
+            new_result = re.sub(r'\*.*?\*', '', new_result)  # Remove text between asterisks
+            new_result = emoji.replace_emoji(new_result, replace='')  # Remove emojis
+
+            new_result = truncate_at_newline(new_result)
+            
+            new_result = remove_invalid_bytes(new_result)
+
+            log_debug(f"Ответ модели: {new_result} (Обработано за {elapsed_time:.2f} с.)")
+
+            return new_result
+        except Exception as e:
+            log_debug(f"Ошибка при использовании модели GGUF: {e}")
+            return "Error using the local model. Please check the model setup."
+    
+    # If no local model is provided, fallback to WebUI
+    log_debug("Локальная модель не предоставлена. Переход на WebUI.")
+    try:
+        url = f"{os.getenv('Text-Generation')}/v1/completions"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "prompt": prompt,
+            "mode": "chat-instruct",
+            "instruction_template": "Alpaca",
+            "max_tokens": 512,
+            "temperature": 0.6,
+            "top_p": 0.8,
+            "top_k": 50,
+        }
+
+        start_time = time.time()
+        response = requests.post(url, headers=headers, json=data, verify=False)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        if response.status_code == 200:
+            results = json.loads(response.content.decode('utf-8'))["choices"][0]["text"]
+            new_result = results.replace("\n", "")
+            new_result = re.sub(r'\*.*?\*', '', new_result)
+            new_result = emoji.replace_emoji(new_result, replace='')
+
+            new_result = truncate_at_newline(new_result)
+
+            new_result = remove_invalid_bytes(new_result)
+
+            log_debug(f"Ответ WebUI: {new_result} (Обработано за {elapsed_time:.2f} с.)")
+
+            return new_result
+        else:
+            log_debug(f"Запрос к WebUI завершился с кодом: {response.status_code}")
+            return "Failed to connect to WebUI."
+    except Exception as e:
+        log_debug(f"Ошибка подключения к WebUI: {e}")
+        return "Fix the Webui."
 
 # Helper function to truncate at newlines
 def truncate_at_newline(text):
