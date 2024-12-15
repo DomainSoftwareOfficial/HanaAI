@@ -23,7 +23,7 @@ from hana import HWindow
 from hana import Ranting
 from hana import Reading
 from hana import hana_ai
-from hana import automata_ai
+from auto import emotion
 from chloe import chloe_ai
 from chloe import ImageGenerator
 from chat import YouTubeChatHandler
@@ -1093,7 +1093,7 @@ class Stream(ctk.CTk):
 
                     if os.getenv('Avatar-On') == 'True':
                         with open(self.resource_path("../Data/Output/hana.txt"), "w", encoding='utf-8') as file:
-                            file.write(automata_ai(processed_string, self.llm_model))
+                            file.write(emotion(processed_string, self.llm_model))
                     else:
                         play(hana_output_path, self.selected_output_device_index)
 

@@ -8,8 +8,8 @@ import json
 from datetime import datetime
 import time
 
-def kaito_ai(input_text, model=None):
-    """Hana AI logic to handle both local GGUF model and fallback to WebUI."""
+def emotion(input_text, model=None):
+    """Automata logic to handle both local GGUF model and fallback to WebUI."""
 
     def log_debug(message, width=150):
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -31,7 +31,7 @@ def kaito_ai(input_text, model=None):
         """Remove byte sequences represented as <0x..>."""
         return re.sub(r'<0x[0-9A-Fa-f]{1,2}>', '', data)
 
-    log_debug("Запуск обработки Hana AI...")
+    log_debug("Запуск обработки Automata AI...")
 
     # Load environment variables (e.g., WebUI URL)
     load_dotenv()
@@ -40,7 +40,7 @@ def kaito_ai(input_text, model=None):
     chat_set = os.getenv('Instruction-Set')
 
     # Use resource_path to access files with PyInstaller compatibility
-    instructions_path = resource_path("../Data/Input/profile.kaito")
+    instructions_path = resource_path("../Data/Input/profile.emote")
 
     log_debug(f"Чтение файлов ввода: {instructions_path}")
 
@@ -56,9 +56,9 @@ def kaito_ai(input_text, model=None):
     log_debug("Файлы успешно прочитаны.")
 
     if chat_set == 'Alpaca':
-        prompt = f"{instructions_pt1}\n\n{instructions_pt2}\n{input_text}\n\n### Response:\nHana Busujima:"
+        prompt = f"{instructions_pt1}\n{instructions_pt2}\nHana Busujima: {input_text}\n\n### Response:\nAutomata:"
     elif chat_set == 'ChatML':
-        prompt = f"{instructions_pt1}\n\n{instructions_pt2}\n{input_text}<|im_end|>\n<|im_start|>assistant\nHana Busujima:"
+        prompt = f"{instructions_pt1}\n{instructions_pt2}\nHana Busujima: {input_text}<|im_end|>\n<|im_start|>assistant\nAutomata:"
 
     log_debug(f"Сгенерирована подсказка с использованием {chat_set} набора инструкций.")
 
@@ -124,9 +124,8 @@ def kaito_ai(input_text, model=None):
             return "Failed to connect to WebUI."
     except Exception as e:
         log_debug(f"Ошибка подключения к WebUI: {e}")
-        return "WebUI connection error."
-    
-# Helper function to truncate at newlines
+        return "Fix the Webui."
+
 def truncate_at_newline(text):
     """Truncate the text right before it encounters any newline sequences (<0x0A><0x0A> or <0x0A> in the output)."""
     # First, look for double newlines \n\n (corresponding to <0x0A><0x0A>)
