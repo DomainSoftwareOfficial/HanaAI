@@ -10,7 +10,8 @@ from twitchio.ext import commands as twitch_commands
 from datetime import datetime
 import time
 import re
-import signal
+import contextlib
+import random
 import json
 import requests
 import emoji
@@ -176,6 +177,7 @@ class AutoChatHandler:
         self.instructions_file = instructions_file
         self.output_file = output_file
         self.repetitions = repetitions
+        self.line_processing_delay = random.uniform(5, 10)  # Initial delay in seconds
 
         # Load the model if a model path is provided
         if self.model_path:
@@ -256,7 +258,7 @@ class AutoChatHandler:
         try:
             url = f"{os.getenv('Text-Generation')}/v1/completions"
             headers = {"Content-Type": "application/json"}
-            data = {
+            data = { 
                 "prompt": prompt,
                 "mode": "chat-instruct",
                 "instruction_template": "Alpaca",
@@ -284,6 +286,51 @@ class AutoChatHandler:
             self.log_debug(f"Ошибка подключения к WebUI: {e}")
             return "Ошибка подключения к WebUI."
 
+    def process_text_file(self, file_path):
+        """
+        Processes a text file line by line with a delay between each line. Each line is expected to have the format:
+        [viewer]::[message]. The function removes the "::" and distributes the 'viewer'
+        and 'message' parts across separate files in round-robin order.
+
+        :param file_path: Path to the text file to be processed.
+        """
+
+        viewer_files = [os.path.join("../Data/Chat/General", f"viewer{i}.hana") for i in range(1, 4)]
+        input_files = [os.path.join("../Data/Chat/General", f"input{i}.hana") for i in range(1, 4)]
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as file:
+                lines = file.readlines()
+
+            # Process lines in round-robin fashion with delay
+            for i, line in enumerate(lines):  
+                if "::" not in line:
+                    self.log_debug(f"Invalid line format: {line.strip()}")
+                    continue
+
+                # Determine which file to write to
+                viewer_index = i % len(viewer_files)
+                input_index = i % len(input_files)
+
+                # Split the line into viewer and message
+                viewer, message = line.strip().split("::", 1)
+
+                # Overwrite (write mode) the corresponding files
+                with open(viewer_files[viewer_index], "w", encoding="utf-8") as vf, \
+                    open(input_files[input_index], "w", encoding="utf-8") as inf:
+                    vf.write(viewer + "\n")
+                    inf.write(message + "\n")
+
+                self.log_debug(f"Processed line: {line.strip()}")
+                time.sleep(self.line_processing_delay)  # Delay before processing the next line
+
+            self.log_debug("File successfully processed and data distributed.")
+
+        except FileNotFoundError:
+            self.log_debug(f"File {file_path} not found.")
+        except Exception as e:
+            self.log_debug(f"Error processing file {file_path}: {e}")
+                
     def truncate_at_newline(self, text):
         """Обрезает текст перед последовательностью новой строки."""
         double_newline_pos = text.find('<0x0A><0x0A>')

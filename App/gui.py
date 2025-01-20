@@ -28,6 +28,7 @@ from chloe import chloe_ai
 from chloe import ImageGenerator
 from chat import YouTubeChatHandler
 from chat import TwitchChatHandler
+from chat import AutoChatHandler
 from audio import translate
 from audio import record_audio
 from audio import distort
@@ -178,6 +179,7 @@ class Stream(ctk.CTk):
         self.last_headpat_time = 0   # Initialize the last headpat command time
         self.random_picker_running = False
         self.monitor_file_running = False
+        self.chat_handler = AutoChatHandler(input_text="")
 
         self.known_emotes = []
 
@@ -429,18 +431,18 @@ class Stream(ctk.CTk):
         self.chat_simulation_window.geometry("400x125")  # Set window size
         self.chat_simulation_window.attributes("-topmost", True)
 
-        # Create a frame to organize slider and checkbox side by side
+        # Create a frame to organize slider and checkbox
         frame = ctk.CTkFrame(self.chat_simulation_window)
         frame.pack(pady=20, padx=20, fill="both", expand=True)
 
-        # Add a slider to the frame
-        self.simulation_slider = ctk.CTkSlider(frame, from_=0, to=100)  # Slider from 0 to 100
+        # Add a slider to control the delay
+        self.simulation_slider = ctk.CTkSlider(frame, from_=10, to=0.5, command=self.update_simulation_delay)
+        self.simulation_slider.set(5)  # Default value
         self.simulation_slider.pack(side="left", padx=10, pady=10, fill="x", expand=True)
 
-        # Add a checkbox next to the slider
-        self.simulation_checkbox = ctk.CTkCheckBox(frame, text="Enable")
+        # Add a checkbox to enable/disable the simulation
+        self.simulation_checkbox = ctk.CTkCheckBox(frame, text="Enable", command=self.toggle_simulation)
         self.simulation_checkbox.pack(side="left", padx=10, pady=10)
-
 
     def update_blacklist_display(self):
         # Clear and repopulate the listbox with updated blacklist names
@@ -478,6 +480,36 @@ class Stream(ctk.CTk):
             func(*args, **kwargs)
         except Exception as e:
             print(f"Error in after callback: {e}")
+
+    def update_simulation_delay(self, value):
+        """Updates the processing delay for the simulation."""
+        self.chat_handler.line_processing_delay = float(value)
+        self.fancy_log("ОБНОВЛЕНИЕ", f"Задержка обработки изменена на {self.chat_handler.line_processing_delay:.2f} секунд.")
+
+    def toggle_simulation(self):
+        """Starts or stops the chat simulation."""
+        self.simulation_enabled = self.simulation_checkbox.get()
+
+        if self.simulation_enabled:
+            self.fancy_log("СИМУЛЯЦИЯ", "Симуляция запущена.")
+            self.simulation_thread = threading.Thread(target=self.run_simulation, daemon=True)
+            self.simulation_thread.start()
+        else:
+            self.fancy_log("СИМУЛЯЦИЯ", "Симуляция остановлена.")
+            self.simulation_enabled = False
+
+    def run_simulation(self):
+        """Processes the chat.txt file line-by-line."""
+        try:
+            file_path = self.chat_handler.output_file
+
+            while self.simulation_enabled:
+                self.chat_handler.process_text_file(file_path)
+                time.sleep(1)  # Add a small delay to avoid excessive processing
+
+            self.fancy_log("СИМУЛЯЦИЯ", "Симуляция завершена.")
+        except Exception as e:
+            self.fancy_log("ОШИБКА", f"Ошибка при запуске симуляции: {e}")
 
     def on_search_change(self, event):
         # Cancel any existing scheduled print function
