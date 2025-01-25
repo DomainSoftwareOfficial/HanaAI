@@ -488,22 +488,21 @@ class Stream(ctk.CTk):
 
     def toggle_simulation(self):
         """Starts or stops the chat simulation."""
-        self.simulation_enabled = self.simulation_checkbox.get()
-
-        if self.simulation_enabled:
+        if self.simulation_checkbox.get():
             self.fancy_log("СИМУЛЯЦИЯ", "Симуляция запущена.")
+            self.chat_handler.simulation_event.set()  # Enable the simulation event
             self.simulation_thread = threading.Thread(target=self.run_simulation, daemon=True)
             self.simulation_thread.start()
         else:
             self.fancy_log("СИМУЛЯЦИЯ", "Симуляция остановлена.")
-            self.simulation_enabled = False
+            self.chat_handler.simulation_event.clear()  # Disable the simulation event
 
     def run_simulation(self):
         """Processes the chat.txt file line-by-line."""
         try:
             file_path = self.chat_handler.output_file
 
-            while self.simulation_enabled:
+            while self.chat_handler.simulation_event.is_set():  # Continue processing only if enabled
                 self.chat_handler.process_text_file(file_path)
                 time.sleep(1)  # Add a small delay to avoid excessive processing
 

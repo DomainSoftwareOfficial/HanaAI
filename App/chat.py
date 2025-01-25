@@ -171,6 +171,7 @@ class AutoChatHandler:
         :param output_file: Path to the output text file.
         :param repetitions: Number of times to run the AI.
         """
+        self.simulation_event = threading.Event()  # Thread-safe control
         self.input_text = input_text
         self.model_path = model_path
         self.model = None  # Placeholder for the loaded model
@@ -302,27 +303,27 @@ class AutoChatHandler:
             with open(file_path, "r", encoding="utf-8") as file:
                 lines = file.readlines()
 
-            # Process lines in round-robin fashion with delay
-            for i, line in enumerate(lines):  
+            for i, line in enumerate(lines):
+                if not self.simulation_event.is_set():  # Check thread-safe stop event
+                    self.log_debug("Processing stopped due to simulation being disabled.")
+                    break
+
                 if "::" not in line:
                     self.log_debug(f"Invalid line format: {line.strip()}")
                     continue
 
-                # Determine which file to write to
                 viewer_index = i % len(viewer_files)
                 input_index = i % len(input_files)
 
-                # Split the line into viewer and message
                 viewer, message = line.strip().split("::", 1)
 
-                # Overwrite (write mode) the corresponding files
                 with open(viewer_files[viewer_index], "w", encoding="utf-8") as vf, \
-                    open(input_files[input_index], "w", encoding="utf-8") as inf:
+                     open(input_files[input_index], "w", encoding="utf-8") as inf:
                     vf.write(viewer + "\n")
                     inf.write(message + "\n")
 
                 self.log_debug(f"Processed line: {line.strip()}")
-                time.sleep(self.line_processing_delay)  # Delay before processing the next line
+                time.sleep(self.line_processing_delay)
 
             self.log_debug("File successfully processed and data distributed.")
 
