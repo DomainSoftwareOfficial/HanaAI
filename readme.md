@@ -4,7 +4,7 @@ Welcome to **HanaAI's** repository! Please choose your preferred language below:
 
 **Available Languages**:
 
-- [🇺🇸 English](./Documents/Readme.en.md)
-- [🇷🇺 Русский](./Documents/Readme.ru.md)
-- [🇪🇸 Español](./Documents/Readme.es.md)
-- [🇯🇵 日本語](./Documents/Readme.ja.md)
+- [🇺🇸 English](./Documents/english.md)
+- [🇷🇺 Русский](./Documents/русский.md)
+- [🇪🇸 Español](./Documents/español.md)
+- [🇯🇵 日本語](./Documents/日本語.md)
