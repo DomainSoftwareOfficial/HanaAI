@@ -8,9 +8,3 @@ Welcome to **HanaAI's** repository! Please choose your preferred language below:
 - [🇷🇺 Русский](./Documents/Readme.ru.md)
 - [🇪🇸 Español](./Documents/Readme.es.md)
 - [🇯🇵 日本語](./Documents/Readme.ja.md)
-
----
-*Explore, Learn, and Contribute!*
-
-- Email: JoynetOfficial@outlook.com
-- Channel: [@JoystickStudiosOfficial](https://www.youtube.com/@JoystickStudiosOfficial)
