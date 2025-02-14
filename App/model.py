@@ -9,7 +9,7 @@ def load_model(model_path, n_ctx=32768, n_threads=8):
     Load the LLaMA model using llama.cpp Python bindings.
 
     Parameters:
-        model_path (str): Path to the LLaMA model weights file (e.g., ggml model).
+        model_path (str): Path to the LLaMA model weights file (e.g., gguf model).
         n_ctx (int): Context size to use for the model (default is 512).
         n_threads (int): Number of threads for inference (default is 8).
 
