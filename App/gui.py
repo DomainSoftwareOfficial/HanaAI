@@ -894,14 +894,9 @@ class Stream(ctk.CTk):
         ]
 
         predefined_inputs = [
-            "Talk about humans or your life",
-            "Say something controversial",
+            "Government Bad?",
+            "Tilted when?",
             "Make a hot take. (topic is your choice).",
-            "Say something that involves you swearing.",
-            "Change subject to anime.",
-            "Change subject to the economy.",
-            "Change subject to politics.",
-            "Change subject to guns.",
         ]
 
         mod_file = self.resource_path('../Data/Chat/Special/moderator.hana')

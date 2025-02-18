@@ -38,5 +38,4 @@ tensorboard-plugin-wit
 pyinstaller
 Pillow
 wavio
-pyttsx3
 git+https://github.com/One-sixth/fairseq.git
