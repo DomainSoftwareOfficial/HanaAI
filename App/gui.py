@@ -390,16 +390,16 @@ class Stream(ctk.CTk):
 
 
         self.blacklist = []
-        self.open_blacklist_window()
+        self.open_output_window()
         self.simulate_chat()
 
         self.protocol("WM_DELETE_WINDOW", self.on_main_window_close)
 
         self.fancy_log("⚙️ ИНИЦИАЛИЗАЦИЯ", "Панель управления полностью инициализирована.")
 
-    def open_blacklist_window(self):
+    def open_output_window(self):
         self.blacklist_window = ctk.CTkToplevel(self)
-        self.blacklist_window.title("Blacklist Control Panel")
+        self.blacklist_window.title("Output Control Panel")
         self.blacklist_window.geometry("400x250")
         self.blacklist_window.attributes("-topmost", True)
 
