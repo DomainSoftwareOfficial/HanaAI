@@ -398,31 +398,108 @@ class Stream(ctk.CTk):
         self.fancy_log("⚙️ ИНИЦИАЛИЗАЦИЯ", "Панель управления полностью инициализирована.")
 
     def open_blacklist_window(self):
-        # Create a new window for the blacklist
         self.blacklist_window = ctk.CTkToplevel(self)
         self.blacklist_window.title("Blacklist Control Panel")
-        self.blacklist_window.geometry("400x250")  # Adjust size as needed
+        self.blacklist_window.geometry("400x250")
         self.blacklist_window.attributes("-topmost", True)
 
-        # Create a textbox with faded placeholder text
-        self.blacklist_entry = ctk.CTkEntry(self.blacklist_window, placeholder_text="Insert name to blacklist")
+        # Create a frame to hold both left and right sections
+        self.main_frame = ctk.CTkFrame(self.blacklist_window)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
+
+        # Create the left part of the window (with entry, button, and listbox)
+        self.left_frame = ctk.CTkFrame(self.main_frame)
+        self.left_frame.grid(row=0, column=0, sticky="nsew")
+
+        self.blacklist_entry = ctk.CTkEntry(self.left_frame, placeholder_text="Insert name to blacklist")
         self.blacklist_entry.pack(pady=20, padx=10, fill="x")
 
-        # Create a button below the textbox with sharp corners
         self.add_to_blacklist_button = ctk.CTkButton(
-            self.blacklist_window, 
+            self.left_frame, 
             text="Add to Blacklist", 
-            corner_radius=0,  # Sharp corners
+            corner_radius=0,  # No rounded corners
             command=self.add_to_blacklist
         )
         self.add_to_blacklist_button.pack(pady=10, padx=10, fill="x")
 
-        # Create a listbox to display blacklisted names
-        self.blacklist_listbox = tk.Listbox(self.blacklist_window, height=6, width=40)
+        self.blacklist_listbox = tk.Listbox(self.left_frame, height=6, width=40)
         self.blacklist_listbox.pack(pady=10, padx=10, fill="both")
 
-        # Populate the listbox with initial blacklist content
+        # Create the right side frame with gray background and no rounded corners
+        self.right_frame = ctk.CTkFrame(self.main_frame, bg_color="gray", corner_radius=0)  # No rounded corners
+        self.right_frame.grid(row=0, column=1, sticky="nsew", padx=5)
+
+        # Configure the grid layout to make the right frame 1/4 of the window width
+        self.main_frame.grid_columnconfigure(0, weight=3)  # Left side takes 3 parts
+        self.main_frame.grid_columnconfigure(1, weight=1)  # Right side takes 1 part
+
+        # Set grid layout for right frame
+        self.right_frame.grid_rowconfigure(0, weight=1)
+        self.right_frame.grid_rowconfigure(1, weight=1)
+        self.right_frame.grid_rowconfigure(2, weight=1)
+        self.right_frame.grid_rowconfigure(3, weight=1)
+
+        self.right_frame.grid_columnconfigure(0, weight=1)
+
+        # Set a reasonable width for the buttons
+        button_width = 90  # Adjust button width to fit nicely within the 1/4 window width
+
+        # Create 4 buttons on the right side
+        self.button1 = ctk.CTkButton(self.right_frame, text="Intro", corner_radius=0, width=button_width, command=lambda: self.copy_audio_file('intro.wav'))
+        self.button1.grid(row=0, column=0, pady=5, padx=10, sticky="ew")
+
+        self.button2 = ctk.CTkButton(self.right_frame, text="Outro", corner_radius=0, width=button_width, command=lambda: self.copy_audio_file('outro.wav'))
+        self.button2.grid(row=1, column=0, pady=5, padx=10, sticky="ew")
+
+        self.button3 = ctk.CTkButton(self.right_frame, text="Button 3", corner_radius=0, width=button_width, command=lambda: self.copy_audio_file('file3.wav'))
+        self.button3.grid(row=2, column=0, pady=5, padx=10, sticky="ew")
+
+        self.button4 = ctk.CTkButton(self.right_frame, text="Button 4", corner_radius=0, width=button_width, command=lambda: self.copy_audio_file('file4.wav'))
+        self.button4.grid(row=3, column=0, pady=5, padx=10, sticky="ew")
+
+        # Set grid weight to ensure both sides expand
+        self.main_frame.grid_rowconfigure(0, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_columnconfigure(1, weight=1)
+
         self.update_blacklist_display()
+
+    def copy_audio_file(self, filename):
+        source_dir = "../Assets/Audio/Record/"
+        dest_audio_dir = "../Assets/Audio/"
+        dest_txt_dir = "../Data/Output/"
+
+        # Ensure the source file exists
+        source_file = os.path.join(source_dir, filename)
+        if not os.path.exists(source_file):
+            print(f"File {filename} not found in {source_dir}")
+            return
+
+        # Copy the audio file to the destination with the new name
+        dest_audio_file = os.path.join(dest_audio_dir, "hana.wav")
+        shutil.copy(source_file, dest_audio_file)
+        print(f"Audio file copied to {dest_audio_file}")
+
+        # Create a corresponding text file in the output directory
+        dest_txt_file = os.path.join(dest_txt_dir, "hana.txt")
+        with open(dest_txt_file, "w") as f:
+            f.write("Nothing to recognize here")
+        print(f"Text file created at {dest_txt_file}")
+
+    def update_blacklist_display(self):
+        self.blacklist_listbox.delete(0, tk.END)
+        for name in self.blacklist:
+            self.blacklist_listbox.insert(tk.END, name)
+
+    def add_to_blacklist(self):
+        name_to_blacklist = self.blacklist_entry.get().strip()
+
+        if name_to_blacklist and name_to_blacklist not in self.blacklist:
+            self.blacklist.append(name_to_blacklist)
+            self.fancy_log("🔒 ЧЕРНЫЙ СПИСОК", f"{name_to_blacklist} добавлен в черный список.")
+            self.blacklist_entry.delete(0, "end")
+            self.update_blacklist_display()
+
 
     def simulate_chat(self):
         # Create a new window for the chat simulation
@@ -443,23 +520,6 @@ class Stream(ctk.CTk):
         # Add a checkbox to enable/disable the simulation
         self.simulation_checkbox = ctk.CTkCheckBox(frame, text="Enable", command=self.toggle_simulation)
         self.simulation_checkbox.pack(side="left", padx=10, pady=10)
-
-    def update_blacklist_display(self):
-        # Clear and repopulate the listbox with updated blacklist names
-        self.blacklist_listbox.delete(0, tk.END)
-        for name in self.blacklist:
-            self.blacklist_listbox.insert(tk.END, name)
-
-    def add_to_blacklist(self):
-        # Get the text from the entry
-        name_to_blacklist = self.blacklist_entry.get().strip()  # Strip to remove extra whitespace
-
-        # Perform the blacklist addition logic here
-        if name_to_blacklist and name_to_blacklist not in self.blacklist:  # Avoid duplicates
-            self.blacklist.append(name_to_blacklist)  # Add name to the blacklist array
-            self.fancy_log("🔒 ЧЕРНЫЙ СПИСОК", f"{name_to_blacklist} добавлен в черный список.")
-            self.blacklist_entry.delete(0, "end")  # Clear the entry after adding
-            self.update_blacklist_display()  # Update the listbox to show the new blacklist content
 
     def safe_after(self, delay, func, *args, **kwargs):
         """
